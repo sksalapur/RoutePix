@@ -122,16 +122,18 @@ class TripRepository(
     suspend fun syncCredentialsToTrips(botToken: String?, chatId: String?) {
         val uid = auth.currentUser?.uid ?: return
         val trips = firestore.collection("trips")
-            .whereEqualTo("adminUid", uid)
+            .whereArrayContains("memberUids", uid)
             .get()
             .await()
         
         val batch = firestore.batch()
         for (doc in trips.documents) {
-            batch.update(doc.reference, mapOf(
-                "telegramBotToken" to botToken,
-                "telegramChatId" to chatId
-            ))
+            if (doc.getString("adminUid") == uid) {
+                batch.update(doc.reference, mapOf(
+                    "telegramBotToken" to botToken,
+                    "telegramChatId" to chatId
+                ))
+            }
         }
         batch.commit().await()
     }
