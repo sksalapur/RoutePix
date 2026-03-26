@@ -6,6 +6,7 @@ data class PhotoMeta(
     val tripId: String = "",
     val uploaderUid: String = "",
     val telegramFileId: String = "",
+    val telegramDocumentId: String? = null,
     val timestamp: Long = 0L,
     val lat: Double? = null,
     val lng: Double? = null,

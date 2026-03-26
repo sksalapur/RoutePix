@@ -910,9 +910,8 @@ private fun PhotoRow(
                     )
                 }
 
-                val sizeText = photo.sizeBytes?.let { " • ${String.format(java.util.Locale.US, "%.1f", it / (1024f * 1024f))} MB" } ?: ""
                 Text(
-                    text = "${formatTimestamp(photo.timestamp)}$sizeText",
+                    text = formatTimestamp(photo.timestamp),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )

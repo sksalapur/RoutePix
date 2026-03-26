@@ -20,10 +20,13 @@ Unlike traditional cloud photo services, RoutePix does **not** upload your photo
 
 - **Collaborative Trips** — Create or join trips via invite codes. All members can upload photos together.
 - **Bulk & Folder Uploads** — Select an entire folder or hundreds of photos at once. Photos upload one-by-one safely in the background.
-- **Smart Image Compression** — To bypass Telegram's strict 10MB Bot API limit, RoutePix features a robust client-side compression engine. It automatically downscales massive images (>4000px resolution) and cleanly extracts still frames from heavy Motion Photos, saving them as 95% quality JPEGs. Lightweight photos below 9.5MB bypass compression entirely to preserve their original bytes.
+- **Original Quality Preservation** — Every photo is uploaded twice: once as a compressed thumbnail for fast in-app browsing, and once as a full-quality document for downloads. Files under 50MB are preserved byte-for-byte — including Motion Photos with embedded video. Files over 50MB are intelligently compressed to just under the Telegram limit while maintaining maximum visual fidelity.
 - **Smart Albums** — Photos are auto-grouped by tag, date, or uploader.
-- **Gesture-Driven Gallery** — Premium photo viewer with swipe gestures and a bottom filmstrip for seamless navigation.
-- **Download & Organize** — Download individual photos or entire albums, saved straight to your device.
+- **Gesture-Driven Gallery** — Premium photo viewer with horizontal swiping, swipe-to-dismiss, pinch-to-zoom, and a bottom filmstrip for seamless navigation.
+- **Multi-Select for Everyone** — All trip members can long-press to select multiple photos for bulk download. Deletion remains admin-only.
+- **Fluid Navigation** — Smooth crossfade transitions, slide animations, and Android predictive back gesture support.
+- **Automatic Update Alerts** — The app checks GitHub for newer releases on startup and notifies you with a direct download link.
+- **Download & Organize** — Download individual photos or entire albums in original quality, saved straight to your device.
 
 ---
 
@@ -64,6 +67,9 @@ To create a trip, you need your own Telegram Bot. It takes 2 minutes:
 
 ## 📦 Release History (Since 1.1.0)
 
+- **v2.0.0** - **Dual-Format Upload Engine.** Every photo is now uploaded as both a compressed thumbnail (`sendPhoto`) and a full-quality document (`sendDocument`). Downloads always retrieve the original-quality version. Files under 50MB are preserved untouched — including Motion Photos. Removed misleading file size display from detailed view.
+- **v1.2.1** - Added automatic app update notifications via the GitHub Releases API. Users are notified when a new version is available with a direct download link.
+- **v1.2.0** - UX Overhaul: global multi-selection for all users, horizontal swipe between photos, vertical swipe-to-dismiss, crossfade album transitions, predictive back gesture support, admin-only trip editing, and hardened Firestore security rules.
 - **v1.1.8** - Implemented a dynamic native Pinch-to-Zoom Gallery Grid, Admin Multiple Photo Bulk Delete, file size display in Detailed view, and a Zero-Bandwidth Cross-Tag Duplication feature for copying photos to new tags.
 - **v1.1.7** - Added Admin-Only Tag Renaming across whole albums. Completely redesigned and uncluttered the full-screen photo viewer.
 - **v1.1.6** - Integrated the built-in Smart Image Compression Engine to resolve Telegram API HTTP 400 errors for files exceeding 10MB.

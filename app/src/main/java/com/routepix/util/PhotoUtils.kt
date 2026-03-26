@@ -152,4 +152,89 @@ object PhotoUtils {
             return null
         }
     }
+    /**
+     * Compress an image for sendDocument upload.
+     * Only compresses if the file exceeds [maxSizeBytes] (default 50 MB).
+     * Uses iterative quality reduction to target ~48 MB.
+     * Returns null if the original file is already small enough.
+     */
+    fun compressForDocument(
+        context: Context,
+        uri: Uri,
+        maxSizeBytes: Long = 50L * 1024 * 1024,
+        targetSizeBytes: Long = 48L * 1024 * 1024
+    ): java.io.File? {
+        try {
+            // Check original size
+            val originalSize = context.contentResolver.openAssetFileDescriptor(uri, "r")
+                ?.use { it.length } ?: return null
+            if (originalSize <= maxSizeBytes) return null // No compression needed
+
+            // Decode full resolution
+            val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                android.graphics.BitmapFactory.decodeStream(stream)
+            } ?: return null
+
+            // Apply EXIF rotation
+            val rotatedBitmap = applyExifRotation(context, uri, bitmap)
+
+            // Iterative quality reduction: start at 97 and step down
+            var quality = 97
+            var tempFile: java.io.File
+            do {
+                tempFile = java.io.File(context.cacheDir, "doc_${java.util.UUID.randomUUID()}.jpg")
+                java.io.FileOutputStream(tempFile).use { out ->
+                    rotatedBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, out)
+                }
+                if (tempFile.length() <= targetSizeBytes) break
+                quality -= 3
+                if (quality < 50) break // Safety floor
+            } while (true)
+
+            if (rotatedBitmap != bitmap) rotatedBitmap.recycle()
+            bitmap.recycle()
+
+            return tempFile
+        } catch (e: Exception) {
+            android.util.Log.e("PhotoUtils", "compressForDocument failed", e)
+            return null
+        }
+    }
+
+    /**
+     * Apply EXIF rotation to a bitmap. Shared between compressImage and compressForDocument.
+     */
+    private fun applyExifRotation(
+        context: Context,
+        uri: Uri,
+        sourceBitmap: android.graphics.Bitmap
+    ): android.graphics.Bitmap {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val exif = ExifInterface(stream)
+                val orientation = exif.getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL
+                )
+                val matrix = android.graphics.Matrix()
+                when (orientation) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+                    ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+                    ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+                }
+                if (!matrix.isIdentity) {
+                    val rotated = android.graphics.Bitmap.createBitmap(
+                        sourceBitmap, 0, 0,
+                        sourceBitmap.width, sourceBitmap.height,
+                        matrix, true
+                    )
+                    rotated
+                } else {
+                    sourceBitmap
+                }
+            } ?: sourceBitmap
+        } catch (_: Exception) {
+            sourceBitmap
+        }
+    }
 }

@@ -21,6 +21,15 @@ interface TelegramApi {
         @Part("caption") caption: RequestBody? = null
     ): TelegramResponse
 
+    @Multipart
+    @POST("/bot{token}/sendDocument")
+    suspend fun sendDocument(
+        @Path("token") token: String,
+        @Part("chat_id") chatId: RequestBody,
+        @Part document: MultipartBody.Part,
+        @Part("caption") caption: RequestBody? = null
+    ): TelegramResponse
+
     
     @GET("/bot{token}/getFile")
     suspend fun getFile(

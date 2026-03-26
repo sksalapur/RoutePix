@@ -12,6 +12,7 @@ data class TelegramMessage(
     @SerializedName("message_id")
     val messageId: Long,
     val photo: List<TelegramPhotoSize>?,
+    val document: TelegramDocument?,
     val caption: String?
 )
 
@@ -22,6 +23,19 @@ data class TelegramPhotoSize(
     val fileUniqueId: String,
     val width: Int,
     val height: Int,
+    @SerializedName("file_size")
+    val fileSize: Long?
+)
+
+data class TelegramDocument(
+    @SerializedName("file_id")
+    val fileId: String,
+    @SerializedName("file_unique_id")
+    val fileUniqueId: String,
+    @SerializedName("file_name")
+    val fileName: String?,
+    @SerializedName("mime_type")
+    val mimeType: String?,
     @SerializedName("file_size")
     val fileSize: Long?
 )

@@ -175,31 +175,33 @@ class PhotoUploadWorker(
 
         val uri = Uri.parse(photo.localUri)
         
-        var compressedFile: java.io.File? = null
+        // ── Step 1: Upload compressed thumbnail via sendPhoto ──────────
+        var thumbnailCompressedFile: java.io.File? = null
+        var photoFileId: String? = null
+        var photoFileSize: Long? = null
+
         try {
             val afd = applicationContext.contentResolver.openAssetFileDescriptor(uri, "r")
             val sizeBytes = afd?.use { it.length } ?: 0L
-            // Only compress if file is larger than 9.5 MB to preserve original quality for smaller files
-            // as requested by the user.
+            // Compress for thumbnail if > 9.5 MB
             if (sizeBytes > 9.5 * 1024 * 1024) {
-               compressedFile = PhotoUtils.compressImage(applicationContext, uri)
+                thumbnailCompressedFile = PhotoUtils.compressImage(applicationContext, uri)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to check file size", e)
+            Log.e(TAG, "Failed to check file size for thumbnail", e)
         }
 
         try {
-            val requestFile = if (compressedFile != null) {
-                compressedFile.asRequestBody("image/jpeg".toMediaType())
+            val thumbRequestFile = if (thumbnailCompressedFile != null) {
+                thumbnailCompressedFile.asRequestBody("image/jpeg".toMediaType())
             } else {
                 PhotoUtils.uriToRequestBody(applicationContext, uri)
             }
-            
-            val photoPart = MultipartBody.Part.createFormData("photo", "photo.jpg", requestFile)
+            val photoPart = MultipartBody.Part.createFormData("photo", "photo.jpg", thumbRequestFile)
             val chatIdBody = chatId.toRequestBody("text/plain".toMediaType())
             val captionBody = photo.tag?.toRequestBody("text/plain".toMediaType())
-    
-            val response = try {
+
+            val photoResponse = try {
                 telegramApi.sendPhoto(
                     token = botToken,
                     chatId = chatIdBody,
@@ -208,69 +210,112 @@ class PhotoUploadWorker(
                 )
             } catch (e: retrofit2.HttpException) {
                 if (e.code() == 400) {
-                    Log.e(TAG, "HTTP 400 for ${photo.localUri}, removing from queue")
+                    Log.e(TAG, "HTTP 400 for sendPhoto ${photo.localUri}, removing from queue")
                     dao.deleteById(photo.id)
-                    return true // Treat as "handled" so we don't block the queue
+                    return true
                 }
                 if (e.code() == 429) {
-                    // Rate limited by Telegram — wait and retry
-                    Log.w(TAG, "Rate limited (429) for ${photo.localUri}, waiting 5s...")
+                    Log.w(TAG, "Rate limited (429) on sendPhoto, waiting 5s...")
                     kotlinx.coroutines.delay(5000)
-                    return false // Will be retried on next worker run
+                    return false
                 }
-                Log.e(TAG, "HTTP ${e.code()} for ${photo.localUri}", e)
+                Log.e(TAG, "HTTP ${e.code()} for sendPhoto ${photo.localUri}", e)
                 return false
             } catch (e: java.net.SocketTimeoutException) {
-                Log.e(TAG, "Timeout uploading ${photo.localUri}", e)
+                Log.e(TAG, "Timeout on sendPhoto ${photo.localUri}", e)
                 return false
             } catch (e: java.io.IOException) {
-                Log.e(TAG, "IO error uploading ${photo.localUri}", e)
+                Log.e(TAG, "IO error on sendPhoto ${photo.localUri}", e)
                 return false
             } catch (e: Exception) {
-                Log.e(TAG, "Upload network error for ${photo.localUri}", e)
+                Log.e(TAG, "Network error on sendPhoto ${photo.localUri}", e)
                 return false
             }
-    
-            if (!response.ok || response.result == null) {
-                Log.e(TAG, "Telegram response not ok: ok=${response.ok}, result=${response.result}")
+
+            if (!photoResponse.ok || photoResponse.result == null) {
+                Log.e(TAG, "sendPhoto response not ok")
                 return false
             }
-    
-            val photoSizes = response.result.photo
+
+            val photoSizes = photoResponse.result.photo
             if (photoSizes.isNullOrEmpty()) {
-                Log.e(TAG, "No photo sizes in Telegram response for ${photo.localUri}")
+                Log.e(TAG, "No photo sizes in sendPhoto response")
                 return false
             }
             val bestPhoto = photoSizes.maxByOrNull { it.width * it.height }!!
-    
-            val photoMeta = PhotoMeta(
-                photoId = UUID.randomUUID().toString(),
-                tripId = tripId,
-                uploaderUid = currentUid,
-                telegramFileId = bestPhoto.fileId,
-                timestamp = photo.timestamp,
-                tag = photo.tag,
-                md5Hash = photo.md5Hash,
-                sizeBytes = bestPhoto.fileSize
-            )
-
-            try {
-                FirebaseFirestore.getInstance()
-                    .collection("trips").document(tripId)
-                    .collection("photos").document(photoMeta.photoId)
-                    .set(photoMeta).await()
-            } catch (e: Exception) {
-                // Photo was uploaded to Telegram but Firestore write failed.
-                // Don't delete from queue so it can be retried.
-                Log.e(TAG, "Firestore write failed for ${photo.localUri}", e)
-                return false
-            }
-    
-            return true
+            photoFileId = bestPhoto.fileId
+            photoFileSize = bestPhoto.fileSize
         } finally {
-            if (compressedFile != null && compressedFile.exists()) {
-                compressedFile.delete()
-            }
+            thumbnailCompressedFile?.let { if (it.exists()) it.delete() }
         }
+
+        // ── Step 2: Upload original quality via sendDocument ──────────
+        var documentFileId: String? = null
+        var docCompressedFile: java.io.File? = null
+
+        try {
+            // Only compress for document if file > 50 MB (Telegram bot limit)
+            docCompressedFile = PhotoUtils.compressForDocument(applicationContext, uri)
+
+            val docRequestFile = if (docCompressedFile != null) {
+                docCompressedFile.asRequestBody("image/jpeg".toMediaType())
+            } else {
+                PhotoUtils.uriToRequestBody(applicationContext, uri)
+            }
+            val docPart = MultipartBody.Part.createFormData("document", "photo.jpg", docRequestFile)
+            val chatIdBody2 = chatId.toRequestBody("text/plain".toMediaType())
+
+            val docResponse = try {
+                telegramApi.sendDocument(
+                    token = botToken,
+                    chatId = chatIdBody2,
+                    document = docPart
+                )
+            } catch (e: retrofit2.HttpException) {
+                if (e.code() == 429) {
+                    Log.w(TAG, "Rate limited (429) on sendDocument, waiting 5s...")
+                    kotlinx.coroutines.delay(5000)
+                }
+                Log.w(TAG, "sendDocument failed (HTTP ${e.code()}), proceeding with photo-only", e)
+                null
+            } catch (e: Exception) {
+                Log.w(TAG, "sendDocument failed, proceeding with photo-only", e)
+                null
+            }
+
+            if (docResponse?.ok == true && docResponse.result?.document != null) {
+                documentFileId = docResponse.result.document.fileId
+                Log.d(TAG, "sendDocument success, docFileId=$documentFileId")
+            } else {
+                Log.w(TAG, "sendDocument response not ok or no document in result, photo-only upload")
+            }
+        } finally {
+            docCompressedFile?.let { if (it.exists()) it.delete() }
+        }
+
+        // ── Step 3: Save metadata to Firestore ──────────
+        val photoMeta = PhotoMeta(
+            photoId = UUID.randomUUID().toString(),
+            tripId = tripId,
+            uploaderUid = currentUid,
+            telegramFileId = photoFileId ?: return false,
+            telegramDocumentId = documentFileId,
+            timestamp = photo.timestamp,
+            tag = photo.tag,
+            md5Hash = photo.md5Hash,
+            sizeBytes = photoFileSize
+        )
+
+        try {
+            FirebaseFirestore.getInstance()
+                .collection("trips").document(tripId)
+                .collection("photos").document(photoMeta.photoId)
+                .set(photoMeta).await()
+        } catch (e: Exception) {
+            Log.e(TAG, "Firestore write failed for ${photo.localUri}", e)
+            return false
+        }
+
+        return true
     }
 }

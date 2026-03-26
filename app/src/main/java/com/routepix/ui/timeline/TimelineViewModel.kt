@@ -167,9 +167,48 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             }
         }
 
+    /**
+     * Resolve the high-quality download URL for a photo.
+     * Uses the document version (original quality) only.
+     */
+    private fun resolveDocumentUrl(photo: PhotoMeta): Flow<String?> = activeTrip
+        .filterNotNull()
+        .flatMapLatest { trip ->
+            flow {
+                val fileId = photo.telegramDocumentId
+                if (fileId == null) {
+                    emit(null)
+                    return@flow
+                }
+                urlCache[fileId]?.let {
+                    emit(it)
+                    return@flow
+                }
+                val adminUid = trip.adminUid
+                val token = getBotToken(adminUid)
+                if (token == null) {
+                    emit(null)
+                    return@flow
+                }
+                try {
+                    val response = RetrofitClient.telegramApi.getFile(token, fileId)
+                    val filePath = response.result?.filePath
+                    if (filePath != null) {
+                        val url = "https://api.telegram.org/file/bot$token/$filePath"
+                        urlCache[fileId] = url
+                        emit(url)
+                    } else {
+                        emit(null)
+                    }
+                } catch (_: Exception) {
+                    emit(null)
+                }
+            }
+        }
+
     fun downloadPhoto(context: android.content.Context, photo: PhotoMeta, albumName: String? = null) {
         viewModelScope.launch {
-            val url = resolveImageUrl(photo).firstOrNull()
+            val url = resolveDocumentUrl(photo).firstOrNull()
             if (url != null) {
                 com.routepix.util.DownloadUtils.enqueueDownload(
                     context, 
@@ -184,7 +223,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     fun downloadAlbum(context: android.content.Context, photos: List<PhotoMeta>, albumName: String) {
         viewModelScope.launch {
             photos.forEach { photo ->
-                val url = resolveImageUrl(photo).firstOrNull()
+                val url = resolveDocumentUrl(photo).firstOrNull()
                 if (url != null) {
                     com.routepix.util.DownloadUtils.enqueueDownload(
                         context, 
