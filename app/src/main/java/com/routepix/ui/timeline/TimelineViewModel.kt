@@ -213,7 +213,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                 com.routepix.util.DownloadUtils.enqueueDownload(
                     context, 
                     url, 
-                    "RoutePix_${photo.telegramFileId.take(8)}.jpg",
+                    "RoutePix_${photo.timestamp}.jpg",
                     albumName
                 )
             }
@@ -228,7 +228,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                     com.routepix.util.DownloadUtils.enqueueDownload(
                         context, 
                         url, 
-                        "RoutePix_${photo.telegramFileId.take(8)}.jpg",
+                        "RoutePix_${photo.timestamp}.jpg",
                         albumName
                     )
                 }

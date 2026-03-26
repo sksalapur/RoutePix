@@ -7,27 +7,34 @@ import android.os.Environment
 
 object DownloadUtils {
 
-    
     fun enqueueDownload(context: Context, url: String, filename: String, albumName: String? = null) {
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val uri = Uri.parse(url)
-        
-        val subPath = if (albumName != null) {
-            "RoutePix/$albumName/$filename"
+
+        // Ensure .jpg extension
+        val safeFilename = if (!filename.endsWith(".jpg", ignoreCase = true)) {
+            "$filename.jpg"
         } else {
-            "RoutePix/$filename"
+            filename
+        }
+
+        val subPath = if (albumName != null) {
+            "RoutePix/$albumName/$safeFilename"
+        } else {
+            "RoutePix/$safeFilename"
         }
 
         val request = DownloadManager.Request(uri)
-            .setTitle(filename)
-            .setDescription("Saving to your RoutePix collection...")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setTitle(safeFilename)
+            .setDescription("Downloading from RoutePix")
+            .setMimeType("image/jpeg")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
             .setDestinationInExternalPublicDir(
                 Environment.DIRECTORY_PICTURES,
                 subPath
             )
 
-        downloadManager.enqueue(request)
+        val downloadId = downloadManager.enqueue(request)
+        DownloadTracker.track(downloadId, safeFilename)
     }
 }
-

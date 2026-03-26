@@ -14,8 +14,8 @@ android {
         applicationId = "com.routepix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "2.0.0"
+        versionCode = 13
+        versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

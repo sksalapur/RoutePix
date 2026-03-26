@@ -119,6 +119,7 @@ fun TimelineScreen(
     val selectedPhotoIds by timelineViewModel.selectedPhotoIds.collectAsState()
     val viewMode by timelineViewModel.viewMode.collectAsState()
     val pendingUpload by photoPickerViewModel.pendingUpload.collectAsState()
+    val pickerQueueState by photoPickerViewModel.queueState.collectAsState()
     
     var selectedGroupKey by remember { mutableStateOf<String?>(null) }
     var showTagEditDialog by remember { mutableStateOf(false) }
@@ -356,11 +357,10 @@ fun TimelineScreen(
             }
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
             if (photos.isEmpty()) {
                 EmptyTimelineState(modifier = Modifier.fillMaxSize())
             } else {
@@ -521,8 +521,51 @@ fun TimelineScreen(
                     }
                 }
             }
-        }
-    }
+        } // end Crossfade / Column
+
+            // Processing overlay — shown immediately after confirming photo selection,
+            // before the bottom progress bar activates
+            val showProcessingOverlay = pickerQueueState.isProcessing && !uploadProgress.isActive
+            AnimatedVisibility(
+                visible = showProcessingOverlay,
+                enter = androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.fadeOut(),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.92f),
+                        tonalElevation = 8.dp,
+                        modifier = Modifier.size(120.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(40.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Processing…",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.DarkGray
+                            )
+                        }
+                    }
+                }
+            }
+        } // end Box
+    } // end Scaffold
 
     AnimatedVisibility(
         visible = selectedPhotoIndex != null && selectedGroupKey != null,
