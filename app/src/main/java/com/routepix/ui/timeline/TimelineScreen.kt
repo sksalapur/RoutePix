@@ -408,7 +408,7 @@ private fun UploadProgressBar(progress: UploadProgress) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
-                    progress = { progress.finished.toFloat() / progress.total },
+                    progress = { if (progress.total > 0) progress.finished.toFloat() / progress.total else 0f },
                     modifier = Modifier.size(36.dp),
                     strokeWidth = 3.dp,
                     color = MaterialTheme.colorScheme.primary,

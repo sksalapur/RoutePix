@@ -11,7 +11,7 @@ object RetrofitClient {
     private const val BASE_URL = "https://api.telegram.org/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.NONE
     }
 
     private val okHttpClient = OkHttpClient.Builder()
