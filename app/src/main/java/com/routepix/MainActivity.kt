@@ -68,7 +68,39 @@ fun RoutepixNavHost(modifier: Modifier = Modifier) {
     NavHost(
         navController = navController,
         startDestination = startDest,
-        modifier = modifier
+        modifier = modifier,
+        enterTransition = {
+            androidx.compose.animation.slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = androidx.compose.animation.core.tween(350)
+            ) + androidx.compose.animation.fadeIn(
+                animationSpec = androidx.compose.animation.core.tween(350)
+            )
+        },
+        exitTransition = {
+            androidx.compose.animation.slideOutHorizontally(
+                targetOffsetX = { fullWidth -> -fullWidth / 3 },
+                animationSpec = androidx.compose.animation.core.tween(350)
+            ) + androidx.compose.animation.fadeOut(
+                animationSpec = androidx.compose.animation.core.tween(350)
+            )
+        },
+        popEnterTransition = {
+            androidx.compose.animation.slideInHorizontally(
+                initialOffsetX = { fullWidth -> -fullWidth / 3 },
+                animationSpec = androidx.compose.animation.core.tween(350)
+            ) + androidx.compose.animation.fadeIn(
+                animationSpec = androidx.compose.animation.core.tween(350)
+            )
+        },
+        popExitTransition = {
+            androidx.compose.animation.slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = androidx.compose.animation.core.tween(350)
+            ) + androidx.compose.animation.fadeOut(
+                animationSpec = androidx.compose.animation.core.tween(350)
+            )
+        }
     ) {
         composable(Routes.Permissions.route) {
             PermissionsScreen(

@@ -6,6 +6,5 @@ data class User(
     val email: String = "",
     val displayName: String = "",
     val telegramBotToken: String? = null,
-    val telegramChatId: String? = null,
-    val backupOnCellular: Boolean = false
+    val telegramChatId: String? = null
 )

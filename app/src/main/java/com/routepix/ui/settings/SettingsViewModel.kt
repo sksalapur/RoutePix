@@ -42,15 +42,14 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
-    fun saveSettings(displayName: String, botToken: String, chatId: String, backupOnCellular: Boolean) {
+    fun saveSettings(displayName: String, botToken: String, chatId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, saveSuccess = false, error = null)
             try {
                 userRepository.updateProfile(
                     displayName = displayName,
                     botToken = botToken,
-                    chatId = chatId,
-                    backupOnCellular = backupOnCellular
+                    chatId = chatId
                 )
 
                 tripRepository.syncCredentialsToTrips(botToken, chatId)

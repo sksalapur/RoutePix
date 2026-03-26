@@ -207,6 +207,7 @@ fun TripHomeScreen(
             items(uiState.trips, key = { it.tripId }) { trip ->
                 TripListItem(
                     trip = trip,
+                    currentUid = tripHomeViewModel.getCurrentUid() ?: "",
                     onClick = { onTripClick(trip) },
                     onEditClick = { tripToRename = trip },
                     onMembersClick = { tripToShowMembers = trip },
@@ -360,6 +361,7 @@ private fun ActionCard(
 @Composable
 private fun TripListItem(
     trip: Trip,
+    currentUid: String,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onMembersClick: () -> Unit,
@@ -405,8 +407,10 @@ private fun TripListItem(
                     }) {
                         Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary)
                     }
-                    IconButton(onClick = onEditClick) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                    if (trip.adminUid == currentUid) {
+                        IconButton(onClick = onEditClick) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                     IconButton(onClick = onMembersClick) {
                         Icon(Icons.Default.Person, contentDescription = "Members", tint = MaterialTheme.colorScheme.primary)

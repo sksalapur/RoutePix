@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.pager.HorizontalPager
@@ -22,6 +23,13 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.aspectRatio
@@ -238,12 +246,18 @@ fun TimelineScreen(
                 },
                 actions = {
                     if (selectedPhotoIds.isNotEmpty()) {
+                        IconButton(onClick = { 
+                            val selectedPhotoMetas = photos.filter { it.photoId in selectedPhotoIds }
+                            timelineViewModel.downloadAlbum(context, selectedPhotoMetas, "Selection") 
+                        }) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = "Download Selected")
+                        }
                         if (isAdmin) {
                             IconButton(onClick = { showTagEditDialog = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit Tag")
+                                Icon(androidx.compose.material.icons.Icons.Default.Edit, contentDescription = "Edit Tag")
                             }
                             IconButton(onClick = { timelineViewModel.deletePhotos(selectedPhotoIds.toList()) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete Selected")
+                                Icon(androidx.compose.material.icons.Icons.Default.Delete, contentDescription = "Delete Selected")
                             }
                         }
                     } else if (selectedGroupKey != null) {
@@ -347,160 +361,162 @@ fun TimelineScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-
-            
             if (photos.isEmpty()) {
-
                 EmptyTimelineState(modifier = Modifier.fillMaxSize())
-            } else if (selectedGroupKey != null && grouped.containsKey(selectedGroupKey)) {
-                val albumPhotos = grouped[selectedGroupKey] ?: emptyList()
-                Column(modifier = Modifier.fillMaxSize()) {
-                    if (viewMode == ViewMode.GRID) {
-                        var gridColumns by remember { mutableStateOf(3) }
-                        var scale by remember { mutableStateOf(1f) }
-        
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(gridColumns),
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(Unit) {
-                                    detectTransformGestures { _, _, zoom, _ ->
-                                        scale *= zoom
-                                        if (scale > 1.3f && gridColumns > 2) {
-                                            gridColumns--
-                                            scale = 1f
-                                        } else if (scale < 0.7f && gridColumns < 6) {
-                                            gridColumns++
-                                            scale = 1f
+            } else {
+                Crossfade(
+                    targetState = selectedGroupKey,
+                    animationSpec = androidx.compose.animation.core.tween(250),
+                    label = "album_transition"
+                ) { currentGroupKey ->
+                    if (currentGroupKey != null && grouped.containsKey(currentGroupKey)) {
+                        val albumPhotos = grouped[currentGroupKey] ?: emptyList()
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            if (viewMode == ViewMode.GRID) {
+                                var gridColumns by remember { mutableStateOf(3) }
+                                var scale by remember { mutableStateOf(1f) }
+
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(gridColumns),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(Unit) {
+                                            detectTransformGestures { _, _, zoom, _ ->
+                                                scale *= zoom
+                                                if (scale > 1.3f && gridColumns > 2) {
+                                                    gridColumns--
+                                                    scale = 1f
+                                                } else if (scale < 0.7f && gridColumns < 6) {
+                                                    gridColumns++
+                                                    scale = 1f
+                                                }
+                                            }
+                                        },
+                                    contentPadding = PaddingValues(bottom = 80.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    items(albumPhotos) { photo ->
+                                        val isSelected = photo.photoId in selectedPhotoIds
+                                        Box(
+                                            modifier = Modifier
+                                                .aspectRatio(1f)
+                                                .combinedClickable(
+                                                    onClick = {
+                                                        if (selectedPhotoIds.isNotEmpty()) timelineViewModel.toggleSelection(photo.photoId)
+                                                        else {
+                                                            selectedPhotoIndex = albumPhotos.indexOf(photo)
+                                                        }
+                                                    },
+                                                    onLongClick = {
+                                                        timelineViewModel.toggleSelection(photo.photoId)
+                                                    }
+                                                )
+                                        ) {
+                                            TelegramAsyncImage(
+                                                photo = photo,
+                                                timelineViewModel = timelineViewModel,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                            if (isSelected) {
+                                                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.4f)))
+                                                Icon(
+                                                    Icons.Default.CheckCircle,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)
+                                                )
+                                            }
                                         }
                                     }
-                                },
-                            contentPadding = PaddingValues(bottom = 80.dp),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            items(albumPhotos) { photo ->
-                                val isSelected = photo.photoId in selectedPhotoIds
-                                Box(
-                                    modifier = Modifier
-                                        .aspectRatio(1f)
-                                        .combinedClickable(
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    items(albumPhotos.size) { index ->
+                                        val photo = albumPhotos[index]
+                                        PhotoRow(
+                                            photo = photo,
+                                            timelineViewModel = timelineViewModel,
+                                            displayName = userNames[photo.uploaderUid] ?: photo.uploaderUid,
+                                            isSelected = photo.photoId in selectedPhotoIds,
+                                            isAdmin = isAdmin,
                                             onClick = {
-                                                if (selectedPhotoIds.isNotEmpty()) timelineViewModel.toggleSelection(photo.photoId)
-                                                else {
-                                                    selectedPhotoIndex = albumPhotos.indexOf(photo)
+                                                if (selectedPhotoIds.isNotEmpty()) {
+                                                    timelineViewModel.toggleSelection(photo.photoId)
+                                                } else {
+                                                    selectedPhotoIndex = index
                                                 }
                                             },
                                             onLongClick = {
-                                                if (isAdmin) timelineViewModel.toggleSelection(photo.photoId)
+                                                timelineViewModel.toggleSelection(photo.photoId)
                                             }
                                         )
-                                ) {
-                                    TelegramAsyncImage(
-                                        photo = photo,
-                                        timelineViewModel = timelineViewModel,
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    if (isSelected) {
-                                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.4f))) 
-                                        Icon(
-                                            Icons.Default.CheckCircle, 
-                                            contentDescription = null, 
-                                            tint = MaterialTheme.colorScheme.primary, 
-                                            modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)
-                                        )
                                     }
+                                    item { Spacer(modifier = Modifier.height(80.dp)) }
                                 }
                             }
                         }
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 80.dp)
                         ) {
-                            items(albumPhotos.size) { index ->
-                                val photo = albumPhotos[index]
-                                PhotoRow(
-                                    photo = photo,
-                                    timelineViewModel = timelineViewModel,
-                                    displayName = userNames[photo.uploaderUid] ?: photo.uploaderUid,
-                                    isSelected = photo.photoId in selectedPhotoIds,
-                                    isAdmin = isAdmin,
-                                    onClick = { 
-                                        if (selectedPhotoIds.isNotEmpty()) {
-                                            timelineViewModel.toggleSelection(photo.photoId)
-                                        } else {
-                                            selectedPhotoIndex = index 
-                                        }
-                                    },
-                                    onLongClick = {
-                                        if (isAdmin) timelineViewModel.toggleSelection(photo.photoId)
-                                    }
-                                )
+                            items(grouped.keys.toList()) { groupKey ->
+                                val groupPhotos = grouped[groupKey] ?: emptyList()
+                                val isGroupSelected = groupPhotos.any { it.photoId in selectedPhotoIds }
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .combinedClickable(
+                                            onClick = {
+                                                if (selectedPhotoIds.isNotEmpty()) {
+                                                    groupPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
+                                                } else {
+                                                    selectedGroupKey = groupKey
+                                                }
+                                            },
+                                            onLongClick = {
+                                                groupPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
+                                            }
+                                        )
+                                        .padding(8.dp)
+                                        .background(
+                                            if (isGroupSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                            else Color.Transparent,
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                ) {
+                                    AlbumCollageThumbnail(
+                                        photos = groupPhotos,
+                                        timelineViewModel = timelineViewModel,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = groupKey,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${groupPhotos.size} photos",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                            item { Spacer(modifier = Modifier.height(80.dp)) }
-                        }
-                    }
-                }
-            } else {
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 80.dp)
-                ) {
-                    items(grouped.keys.toList()) { groupKey ->
-                        val groupPhotos = grouped[groupKey] ?: emptyList()
-                        val isGroupSelected = groupPhotos.any { it.photoId in selectedPhotoIds }
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = {
-                                        if (selectedPhotoIds.isNotEmpty()) {
-                                            groupPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
-                                        } else {
-                                            selectedGroupKey = groupKey
-                                        }
-                                    },
-                                    onLongClick = {
-                                        if (isAdmin) {
-                                            groupPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
-                                        }
-                                    }
-                                )
-                                .padding(8.dp)
-                                .background(
-                                    if (isGroupSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                    else Color.Transparent,
-                                    RoundedCornerShape(12.dp)
-                                )
-                        ) {
-                            AlbumCollageThumbnail(
-                                photos = groupPhotos,
-                                timelineViewModel = timelineViewModel,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = groupKey,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${groupPhotos.size} photos",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
@@ -508,9 +524,17 @@ fun TimelineScreen(
         }
     }
 
-    if (selectedPhotoIndex != null && selectedGroupKey != null) {
+    AnimatedVisibility(
+        visible = selectedPhotoIndex != null && selectedGroupKey != null,
+        enter = androidx.compose.animation.fadeIn(
+            animationSpec = androidx.compose.animation.core.tween(200)
+        ),
+        exit = androidx.compose.animation.fadeOut(
+            animationSpec = androidx.compose.animation.core.tween(150)
+        )
+    ) {
         val albumPhotos = grouped[selectedGroupKey] ?: emptyList()
-        if (albumPhotos.isNotEmpty()) {
+        if (albumPhotos.isNotEmpty() && selectedPhotoIndex != null) {
             PhotoPagerOverlay(
                 initialIndex = selectedPhotoIndex!!,
                 photoList = albumPhotos,
@@ -1135,11 +1159,28 @@ private fun PhotoPagerOverlay(
         pagerState.scrollToPage(initialIndex)
     }
 
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val draggableState = rememberDraggableState { delta ->
+        if (!isZoomed) {
+            dragOffset += delta
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .clickable(enabled = false) {}
+            .background(Color.Black.copy(alpha = (1f - (kotlin.math.abs(dragOffset) / 1000f)).coerceIn(0f, 1f)))
+            .draggable(
+                state = draggableState,
+                orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                onDragStopped = {
+                    if (kotlin.math.abs(dragOffset) > 300f) {
+                        onClose()
+                    } else {
+                        dragOffset = 0f
+                    }
+                }
+            )
     ) {
         HorizontalPager(
             state = pagerState,
@@ -1165,18 +1206,41 @@ private fun PhotoPagerOverlay(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(page) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(1f, 5f)
-                            if (scale > 1f) {
-                                val maxX = (size.width * (scale - 1)) / 2
-                                val maxY = (size.height * (scale - 1)) / 2
-                                offset = Offset(
-                                    x = (offset.x + pan.x * scale).coerceIn(-maxX, maxX),
-                                    y = (offset.y + pan.y * scale).coerceIn(-maxY, maxY)
-                                )
-                            } else {
-                                offset = Offset.Zero
-                            }
+                        awaitEachGesture {
+                            // Wait for first pointer
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val event = awaitPointerEvent()
+                                val fingerCount = event.changes.count { it.pressed }
+                                if (fingerCount >= 2) {
+                                    // Pinch-to-zoom: always active
+                                    val zoom = event.calculateZoom()
+                                    val pan = event.calculatePan()
+                                    scale = (scale * zoom).coerceIn(1f, 5f)
+                                    if (scale > 1f) {
+                                        val maxX = (size.width * (scale - 1)) / 2
+                                        val maxY = (size.height * (scale - 1)) / 2
+                                        offset = Offset(
+                                            x = (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                            y = (offset.y + pan.y).coerceIn(-maxY, maxY)
+                                        )
+                                    } else {
+                                        offset = Offset.Zero
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                } else if (fingerCount == 1 && isZoomed) {
+                                    // Single-finger pan: only when zoomed
+                                    val pan = event.calculatePan()
+                                    val maxX = (size.width * (scale - 1)) / 2
+                                    val maxY = (size.height * (scale - 1)) / 2
+                                    offset = Offset(
+                                        x = (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                        y = (offset.y + pan.y).coerceIn(-maxY, maxY)
+                                    )
+                                    event.changes.forEach { it.consume() }
+                                }
+                                // Single finger + NOT zoomed: don't consume → pager handles swipe
+                            } while (event.changes.any { it.pressed })
                         }
                     }
                     .pointerInput(page) {
@@ -1202,7 +1266,7 @@ private fun PhotoPagerOverlay(
                             scaleX = scale
                             scaleY = scale
                             translationX = offset.x
-                            translationY = offset.y
+                            translationY = offset.y + dragOffset
                         },
                     contentScale = ContentScale.Fit
                 )

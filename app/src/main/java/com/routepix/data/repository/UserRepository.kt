@@ -28,16 +28,14 @@ class UserRepository(
     suspend fun updateProfile(
         displayName: String,
         botToken: String?,
-        chatId: String?,
-        backupOnCellular: Boolean
+        chatId: String?
     ) {
         val uid = auth.currentUser?.uid ?: return
         firestore.collection("users").document(uid).update(
             mapOf(
                 "displayName" to displayName,
                 "telegramBotToken" to botToken,
-                "telegramChatId" to chatId,
-                "backupOnCellular" to backupOnCellular
+                "telegramChatId" to chatId
             )
         ).await()
     }

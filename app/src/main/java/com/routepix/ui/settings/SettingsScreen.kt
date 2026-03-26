@@ -46,7 +46,6 @@ fun SettingsScreen(
     var displayName by remember(uiState.user) { mutableStateOf(uiState.user?.displayName ?: "") }
     var botToken by remember(uiState.user) { mutableStateOf(uiState.user?.telegramBotToken ?: "") }
     var chatId by remember(uiState.user) { mutableStateOf(uiState.user?.telegramChatId ?: "") }
-    var backupOnCellular by remember(uiState.user) { mutableStateOf(uiState.user?.backupOnCellular ?: false) }
     
     var isEditing by remember { mutableStateOf(false) }
     var showTelegramGuide by remember { mutableStateOf(false) }
@@ -173,31 +172,11 @@ fun SettingsScreen(
 
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            SettingsCard(title = "Network Preferences") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                        Text("Backup on Cellular", fontWeight = FontWeight.SemiBold)
-                        Text("Allow uploading photos when Wi-Fi is unavailable", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(
-                        checked = backupOnCellular,
-                        onCheckedChange = { backupOnCellular = it },
-                        enabled = isEditing
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(32.dp))
 
             if (isEditing) {
                 Button(
-                    onClick = { viewModel.saveSettings(displayName, botToken, chatId, backupOnCellular) },
+                    onClick = { viewModel.saveSettings(displayName, botToken, chatId) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
                     enabled = !uiState.isSaving
