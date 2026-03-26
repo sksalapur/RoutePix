@@ -35,12 +35,20 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.Context
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SecurityManager.init(applicationContext)
         enableEdgeToEdge()
+
+        // Check for app updates in the background
+        lifecycleScope.launch {
+            com.routepix.util.UpdateChecker.checkForUpdate(applicationContext)
+        }
+
         setContent {
             RoutepixTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->

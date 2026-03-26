@@ -132,7 +132,7 @@ fun PermissionsScreen(
 
             PermissionToggle(
                 title = "Notifications",
-                description = "Shows a real-time progress bar in your notification tray during uploads.",
+                description = "Shows upload progress and alerts you when a new app version is available.",
                 icon = Icons.Default.Notifications,
                 checked = hasNotificationPermission,
                 onToggle = {
