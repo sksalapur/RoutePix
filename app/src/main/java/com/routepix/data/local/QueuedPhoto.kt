@@ -4,7 +4,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 
-@Entity(tableName = "queued_photos")
+import androidx.room.Index
+
+@Entity(
+    tableName = "queued_photos",
+    indices = [Index(value = ["tripId", "md5Hash"], unique = true)]
+)
 data class QueuedPhoto(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,

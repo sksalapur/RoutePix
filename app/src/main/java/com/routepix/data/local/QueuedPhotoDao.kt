@@ -15,16 +15,25 @@ interface QueuedPhotoDao {
     @Query("DELETE FROM queued_photos WHERE id = :id")
     suspend fun deleteById(id: Int)
 
+    @Query("DELETE FROM queued_photos WHERE tripId = :tripId")
+    suspend fun deleteForTrip(tripId: String)
+
     @Query("SELECT * FROM queued_photos WHERE tripId = :tripId ORDER BY timestamp ASC")
     fun getAllForTrip(tripId: String): Flow<List<QueuedPhoto>>
 
     @Query("SELECT * FROM queued_photos WHERE md5Hash = :hash LIMIT 1")
     suspend fun getByHash(hash: String): QueuedPhoto?
 
+    @Query("SELECT * FROM queued_photos WHERE md5Hash = :hash AND tripId = :tripId LIMIT 1")
+    suspend fun getByHashForTrip(hash: String, tripId: String): QueuedPhoto?
+
     @Query("SELECT * FROM queued_photos WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): QueuedPhoto?
 
     @Query("SELECT * FROM queued_photos WHERE tripId = :tripId ORDER BY timestamp ASC")
     suspend fun getPendingForTrip(tripId: String): List<QueuedPhoto>
+
+    @Query("SELECT COUNT(*) FROM queued_photos WHERE tripId = :tripId")
+    fun getPendingCountFlow(tripId: String): Flow<Int>
 }
 

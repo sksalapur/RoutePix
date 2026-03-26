@@ -15,11 +15,16 @@ import com.routepix.data.local.QueuedPhoto
 import com.routepix.data.local.RoutepixDatabase
 import com.routepix.util.PhotoUtils
 import com.routepix.worker.PhotoUploadWorker
+import com.routepix.data.model.PhotoMeta
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 data class UploadQueueState(
@@ -39,13 +44,32 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
     private val _queueState = MutableStateFlow(UploadQueueState())
     val queueState: StateFlow<UploadQueueState> = _queueState.asStateFlow()
 
+    data class UploadRequest(
+        val tripId: String,
+        val uris: List<Uri>,
+        val tag: String?,
+        val conflictingUris: List<Uri>,
+        val conflictingMetas: List<PhotoMeta>
+    )
+
+    private val _pendingUpload = MutableStateFlow<UploadRequest?>(null)
+    val pendingUpload: StateFlow<UploadRequest?> = _pendingUpload.asStateFlow()
+
+    /**
+     * Application-scoped coroutine scope that survives ViewModel destruction.
+     * Uses Dispatchers.IO (not Main) so it's not tied to Activity lifecycle.
+     * This ensures the enqueue operation completes even if the user navigates
+     * away from the timeline screen (which cancels viewModelScope).
+     */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     companion object {
         private const val TAG = "PhotoPickerVM"
-        private const val CHUNK_SIZE = 5
+        private const val CHUNK_SIZE = 10
     }
 
     fun enqueueFolder(tripId: String, treeUri: Uri, tag: String?) {
-        viewModelScope.launch {
+        appScope.launch {
             val context = getApplication<Application>()
             try {
                 context.contentResolver.takePersistableUriPermission(
@@ -93,54 +117,187 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             if (uris.isNotEmpty()) {
+                // Ensure trip still exists before starting
+                try {
+                    val tripDoc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("trips").document(tripId).get().await()
+                    if (!tripDoc.exists()) {
+                        Log.e(TAG, "Trip $tripId does not exist, aborting enqueue")
+                        _queueState.value = UploadQueueState(failed = uris.size, isProcessing = false)
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to verify trip existence", e)
+                }
+                val (conflictUris, conflictMetas) = checkTagConflicts(tripId, uris, tag)
+                if (conflictMetas.isNotEmpty()) {
+                    _pendingUpload.value = UploadRequest(tripId, uris, tag, conflictUris, conflictMetas)
+                } else {
+                    enqueuePhotos(tripId, uris, tag)
+                }
+            }
+        }
+    }
+
+    fun requestUpload(tripId: String, uris: List<Uri>, tag: String?) {
+        appScope.launch {
+            val (conflictUris, conflictMetas) = checkTagConflicts(tripId, uris, tag)
+            if (conflictMetas.isNotEmpty()) {
+                _pendingUpload.value = UploadRequest(tripId, uris, tag, conflictUris, conflictMetas)
+            } else {
                 enqueuePhotos(tripId, uris, tag)
             }
         }
     }
 
-    fun enqueuePhotos(tripId: String, uris: List<Uri>, tag: String?) {
-        viewModelScope.launch {
-            _queueState.value = UploadQueueState(totalSelected = uris.size, isProcessing = true)
-
-            workManager.pruneWork()
-
-            var queued = 0
-            var skipped = 0
-            var failed = 0
-
-        val chunks = uris.chunked(CHUNK_SIZE)
-
-        for (chunk in chunks) {
-            val results = withContext(Dispatchers.IO) {
-                chunk.map { uri -> processPhoto(uri, tripId, tag) }
-            }
-
-            for (result in results) {
-                when (result) {
-                    is EnqueueResult.Queued -> queued++
-                    is EnqueueResult.Duplicate -> skipped++
-                    is EnqueueResult.Failed -> failed++
-                }
-            }
-
-            // Enqueue batch worker after inserting the chunk
-            if (queued > 0) enqueueWorker(tripId)
-
-            _queueState.value = UploadQueueState(
-                totalSelected = uris.size,
-                queued = queued,
-                duplicatesSkipped = skipped,
-                failed = failed,
-                isProcessing = true
-            )
+    fun resolvePendingUpload(forceAdd: Boolean) {
+        val request = _pendingUpload.value ?: return
+        _pendingUpload.value = null
+        if (forceAdd) {
+            forceAddPhotos(request.tripId, request.conflictingMetas, request.tag)
         }
-
-            _queueState.value = _queueState.value.copy(isProcessing = false)
-            Log.d(TAG, "Enqueue complete: queued=$queued, skipped=$skipped, failed=$failed out of ${uris.size}")
+        val remainingUris = request.uris - request.conflictingUris.toSet()
+        if (remainingUris.isNotEmpty()) {
+            enqueuePhotos(request.tripId, remainingUris, request.tag)
         }
     }
 
-    private suspend fun processPhoto(uri: Uri, tripId: String, tag: String?): EnqueueResult {
+    suspend fun checkTagConflicts(tripId: String, uris: List<Uri>, newTag: String?): Pair<List<Uri>, List<PhotoMeta>> = withContext(Dispatchers.IO) {
+        val context = getApplication<Application>()
+        val existingHashes = mutableMapOf<String, PhotoMeta>()
+        try {
+            val snapshot = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("trips").document(tripId)
+                .collection("photos")
+                .get().await()
+            for (doc in snapshot.documents) {
+                val meta = doc.toObject(PhotoMeta::class.java)
+                if (meta?.md5Hash != null) {
+                    existingHashes[meta.md5Hash] = meta
+                }
+            }
+        } catch (_: Exception) {}
+
+        val conflictingUris = mutableListOf<Uri>()
+        val conflictingMetas = mutableListOf<PhotoMeta>()
+
+        for (uri in uris) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+            
+            val md5 = PhotoUtils.computeMd5(context, uri)
+            val existing = existingHashes[md5]
+            if (existing != null && existing.tag != newTag) {
+                conflictingUris.add(uri)
+                conflictingMetas.add(existing)
+            }
+        }
+        Pair(conflictingUris, conflictingMetas)
+    }
+
+    fun forceAddPhotos(tripId: String, photos: List<PhotoMeta>, newTag: String?) {
+        val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+        val uid = auth.currentUser?.uid ?: return
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        val batch = db.batch()
+        
+        for (photo in photos) {
+            val newId = java.util.UUID.randomUUID().toString()
+            val newPhoto = PhotoMeta(
+                photoId = newId,
+                telegramFileId = photo.telegramFileId,
+                uploaderUid = uid,
+                timestamp = System.currentTimeMillis(),
+                placeName = photo.placeName,
+                lat = photo.lat,
+                lng = photo.lng,
+                tag = newTag,
+                md5Hash = photo.md5Hash,
+                sizeBytes = photo.sizeBytes
+            )
+            val ref = db.collection("trips").document(tripId).collection("photos").document(newId)
+            batch.set(ref, newPhoto)
+        }
+        
+        appScope.launch {
+            try {
+                batch.commit().await()
+                Log.d(TAG, "Successfully force duplicated ${photos.size} photos cross-tag")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to force duplicate", e)
+            }
+        }
+    }
+
+    fun enqueuePhotos(tripId: String, uris: List<Uri>, tag: String?) {
+        // Launch on appScope so it survives back navigation
+        appScope.launch {
+            // NonCancellable ensures this completes even if ViewModel is destroyed
+            withContext(NonCancellable) {
+                _queueState.value = UploadQueueState(totalSelected = uris.size, isProcessing = true)
+
+                workManager.pruneWork()
+
+                var queuedCount = 0
+                var skipped = 0
+                var failed = 0
+
+                // Batch the Firestore duplicate check: fetch all existing md5 hashes
+                // for this trip ONCE, instead of doing 502 individual queries.
+                val existingHashes = mutableSetOf<String>()
+                try {
+                    val snapshot = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("trips").document(tripId)
+                        .collection("photos")
+                        .get().await()
+                    for (doc in snapshot.documents) {
+                        doc.getString("md5Hash")?.let { existingHashes.add(it) }
+                    }
+                    Log.d(TAG, "Pre-fetched ${existingHashes.size} existing hashes from Firestore")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to pre-fetch existing hashes, continuing without dedup", e)
+                }
+
+                val chunks = uris.chunked(CHUNK_SIZE)
+
+                for (chunk in chunks) {
+                    val results = chunk.map { uri -> processPhoto(uri, tripId, tag, existingHashes) }
+
+                    for (result in results) {
+                        when (result) {
+                            is EnqueueResult.Queued -> queuedCount++
+                            is EnqueueResult.Duplicate -> skipped++
+                            is EnqueueResult.Failed -> failed++
+                        }
+                    }
+
+                    _queueState.value = UploadQueueState(
+                        totalSelected = uris.size,
+                        queued = queuedCount,
+                        duplicatesSkipped = skipped,
+                        failed = failed,
+                        isProcessing = true
+                    )
+                }
+
+                // Enqueue the worker ONCE after all photos are in the DB
+                if (queuedCount > 0) {
+                    enqueueWorker(tripId)
+                }
+
+                _queueState.value = _queueState.value.copy(isProcessing = false)
+                Log.d(TAG, "Enqueue complete: queued=$queuedCount, skipped=$skipped, failed=$failed out of ${uris.size}")
+            }
+        }
+    }
+
+    private suspend fun processPhoto(
+        uri: Uri,
+        tripId: String,
+        tag: String?,
+        existingHashes: Set<String>
+    ): EnqueueResult {
         val context = getApplication<Application>()
         return try {
             try {
@@ -152,8 +309,15 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
 
             val md5 = PhotoUtils.computeMd5(context, uri)
 
-            val existing = dao.getByHash(md5)
-            if (existing != null) {
+            // Check 1: Is it already queued locally for this trip?
+            val existingLocal = dao.getByHashForTrip(md5, tripId)
+            if (existingLocal != null) {
+                return EnqueueResult.Duplicate
+            }
+
+            // Check 2: Is it already uploaded in Firestore for this trip?
+            // Uses the pre-fetched set (O(1) lookup) instead of a network call per photo.
+            if (md5 in existingHashes) {
                 return EnqueueResult.Duplicate
             }
 
@@ -193,7 +357,7 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
 
         workManager.enqueueUniqueWork(
             "upload_chain_$tripId",
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            ExistingWorkPolicy.REPLACE,
             workRequest
         )
     }

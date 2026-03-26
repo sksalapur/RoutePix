@@ -20,6 +20,7 @@ Unlike traditional cloud photo services, RoutePix does **not** upload your photo
 
 - **Collaborative Trips** — Create or join trips via invite codes. All members can upload photos together.
 - **Bulk & Folder Uploads** — Select an entire folder or hundreds of photos at once. Photos upload one-by-one safely in the background.
+- **Smart Image Compression** — To bypass Telegram's strict 10MB Bot API limit, RoutePix features a robust client-side compression engine. It automatically downscales massive images (>4000px resolution) and cleanly extracts still frames from heavy Motion Photos, saving them as 95% quality JPEGs. Lightweight photos below 9.5MB bypass compression entirely to preserve their original bytes.
 - **Smart Albums** — Photos are auto-grouped by tag, date, or uploader.
 - **Gesture-Driven Gallery** — Premium photo viewer with swipe gestures and a bottom filmstrip for seamless navigation.
 - **Download & Organize** — Download individual photos or entire albums, saved straight to your device.
@@ -58,6 +59,19 @@ To create a trip, you need your own Telegram Bot. It takes 2 minutes:
 | **Background** | WorkManager for persistent chunked uploads |
 | **Network** | Retrofit & OkHttp (Telegram Bot API) |
 | **Security** | AndroidX Security-Crypto |
+
+---
+
+## 📦 Release History (Since 1.1.0)
+
+- **v1.1.8** - Implemented a dynamic native Pinch-to-Zoom Gallery Grid, Admin Multiple Photo Bulk Delete, file size display in Detailed view, and a Zero-Bandwidth Cross-Tag Duplication feature for copying photos to new tags.
+- **v1.1.7** - Added Admin-Only Tag Renaming across whole albums. Completely redesigned and uncluttered the full-screen photo viewer.
+- **v1.1.6** - Integrated the built-in Smart Image Compression Engine to resolve Telegram API HTTP 400 errors for files exceeding 10MB.
+- **v1.1.5** - Improved background resource management, temp-file lifecycle, and established logic bypasses for oversized Motion Photos.
+- **v1.1.4** - Created a dedicated "Upload Queue" view so users can track pending or failed background uploads.
+- **v1.1.3** - Shipped completely new Timeline sorting modes: Group `By Uploader`, `By Tag`, and `By Date`.
+- **v1.1.2** - Added customizable input functionality to the Tag Upload Bottom Sheet UI.
+- **v1.1.1** - Crucial hotfixes resolving Jetpack Compose NaN scaling crashes and Retrofit network memory leaks.
 
 ---
 

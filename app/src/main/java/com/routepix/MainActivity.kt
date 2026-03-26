@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,7 +30,11 @@ import com.routepix.ui.settings.SettingsScreen
 import com.routepix.ui.settings.SettingsViewModel
 import com.routepix.ui.theme.RoutepixTheme
 import com.routepix.ui.timeline.TimelineScreen
+import com.routepix.ui.permissions.PermissionsScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Context
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,28 +55,30 @@ class MainActivity : ComponentActivity() {
 fun RoutepixNavHost(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
 
-    val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        arrayOf(
-            Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VIDEO
-        )
+    val context = LocalContext.current
+    val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
     } else {
-        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        Manifest.permission.READ_EXTERNAL_STORAGE
     }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> }
-
-    LaunchedEffect(Unit) {
-        permissionLauncher.launch(permissions)
-    }
+    
+    val hasStorage = ContextCompat.checkSelfPermission(context, storagePermission) == PackageManager.PERMISSION_GRANTED
+    val startDest = if (hasStorage) Routes.Auth.route else Routes.Permissions.route
 
     NavHost(
         navController = navController,
-        startDestination = Routes.Auth.route,
+        startDestination = startDest,
         modifier = modifier
     ) {
+        composable(Routes.Permissions.route) {
+            PermissionsScreen(
+                onAllGranted = {
+                    navController.navigate(Routes.Auth.route) {
+                        popUpTo(Routes.Permissions.route) { inclusive = true }
+                    }
+                }
+            )
+        }
 
         composable(Routes.Auth.route) {
             AuthScreen(

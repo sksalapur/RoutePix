@@ -10,6 +10,8 @@ data class PhotoMeta(
     val lat: Double? = null,
     val lng: Double? = null,
     val placeName: String? = null,
-    val tag: String? = null
+    val tag: String? = null,
+    val md5Hash: String? = null,
+    val sizeBytes: Long? = null
 )
 

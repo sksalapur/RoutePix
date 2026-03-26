@@ -8,28 +8,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,22 +35,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.*
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material3.BottomSheetDefaults
@@ -125,13 +105,70 @@ fun TimelineScreen(
     val userNames by timelineViewModel.userNames.collectAsState()
     val availableTags by timelineViewModel.availableTags.collectAsState()
     val uploadProgress by timelineViewModel.uploadProgress.collectAsState()
+    val selectedPhotoIds by timelineViewModel.selectedPhotoIds.collectAsState()
+    val viewMode by timelineViewModel.viewMode.collectAsState()
+    val pendingUpload by photoPickerViewModel.pendingUpload.collectAsState()
+    
+    var selectedGroupKey by remember { mutableStateOf<String?>(null) }
+    var showTagEditDialog by remember { mutableStateOf(false) }
+    var tagToEdit by remember { mutableStateOf("") }
+
+    if (showTagEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showTagEditDialog = false },
+            title = { Text("Edit Tag") },
+            text = {
+                OutlinedTextField(
+                    value = tagToEdit,
+                    onValueChange = { tagToEdit = it },
+                    label = { Text("New Tag (e.g. Day 1, Scenery)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val finalTag = if (tagToEdit.isBlank()) null else tagToEdit
+                    timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), finalTag)
+                    showTagEditDialog = false
+                    tagToEdit = ""
+                    timelineViewModel.clearSelection()
+                    selectedGroupKey = null
+                }) {
+                    Text("Update")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTagEditDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (pendingUpload != null) {
+        AlertDialog(
+            onDismissRequest = { photoPickerViewModel.resolvePendingUpload(false) },
+            title = { Text("Already Uploaded") },
+            text = { Text("${pendingUpload!!.conflictingUris.size} of the selected photos are already uploaded under a different tag. Would you like to add them to '${pendingUpload!!.tag ?: "Untagged"}' as well?") },
+            confirmButton = {
+                TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(true) }) {
+                    Text("Add Anyway")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(false) }) {
+                    Text("Skip Duplicates")
+                }
+            }
+        )
+    }
 
     var showTagSheet by remember { mutableStateOf(false) }
     var pendingUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingFolderUri by remember { mutableStateOf<Uri?>(null) }
     var tagText by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf<String?>(null) }
-    var selectedGroupKey by remember { mutableStateOf<String?>(null) }
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
@@ -157,8 +194,10 @@ fun TimelineScreen(
         }
     }
 
-    BackHandler(enabled = selectedGroupKey != null || selectedPhotoIndex != null) {
-        if (selectedPhotoIndex != null) {
+    BackHandler(enabled = selectedPhotoIds.isNotEmpty() || selectedGroupKey != null || selectedPhotoIndex != null) {
+        if (selectedPhotoIds.isNotEmpty()) {
+            timelineViewModel.clearSelection()
+        } else if (selectedPhotoIndex != null) {
             selectedPhotoIndex = null
         } else if (selectedGroupKey != null) {
             selectedGroupKey = null
@@ -171,21 +210,64 @@ fun TimelineScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = selectedGroupKey ?: activeTrip?.name ?: "Timeline",
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    if (selectedPhotoIds.isEmpty()) {
+                        Text(
+                            text = selectedGroupKey ?: activeTrip?.name ?: "Timeline",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    } else {
+                        Text(
+                            text = "${selectedPhotoIds.size} selected",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 },
-
+                navigationIcon = {
+                    if (selectedPhotoIds.isNotEmpty()) {
+                        IconButton(onClick = { timelineViewModel.clearSelection() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear Selection")
+                        }
+                    } else {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                },
                 actions = {
-                    if (selectedGroupKey != null) {
+                    if (selectedPhotoIds.isNotEmpty()) {
+                        if (isAdmin) {
+                            IconButton(onClick = { showTagEditDialog = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Tag")
+                            }
+                            IconButton(onClick = { timelineViewModel.deletePhotos(selectedPhotoIds.toList()) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Selected")
+                            }
+                        }
+                    } else if (selectedGroupKey != null) {
                         val albumPhotos = grouped[selectedGroupKey] ?: emptyList()
+                        IconButton(onClick = { 
+                            timelineViewModel.setViewMode(
+                                if (viewMode == ViewMode.DETAILED) ViewMode.GRID else ViewMode.DETAILED
+                            ) 
+                        }) {
+                            Icon(
+                                imageVector = if (viewMode == ViewMode.DETAILED) Icons.Default.GridView else Icons.Default.ViewList,
+                                contentDescription = "Toggle View"
+                            )
+                        }
                         IconButton(onClick = { 
                             timelineViewModel.downloadAlbum(context, albumPhotos, selectedGroupKey!!) 
                         }) {
                             Icon(Icons.Default.Download, contentDescription = "Download Album")
                         }
                         if (isAdmin) {
+                            IconButton(onClick = {
+                                tagToEdit = if (selectedGroupKey == "Untagged") "" else selectedGroupKey!!
+                                albumPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
+                                showTagEditDialog = true
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Rename Tag")
+                            }
                             IconButton(onClick = { 
                                 timelineViewModel.deleteAlbum(albumPhotos)
                                 selectedGroupKey = null
@@ -250,7 +332,10 @@ fun TimelineScreen(
         },
         bottomBar = {
             if (uploadProgress.isActive) {
-                UploadProgressBar(progress = uploadProgress)
+                UploadProgressBar(
+                    progress = uploadProgress,
+                    onCancel = { timelineViewModel.cancelUpload() }
+                )
             }
         }
     ) { padding ->
@@ -265,24 +350,95 @@ fun TimelineScreen(
 
                 EmptyTimelineState(modifier = Modifier.fillMaxSize())
             } else if (selectedGroupKey != null && grouped.containsKey(selectedGroupKey)) {
-
                 val albumPhotos = grouped[selectedGroupKey] ?: emptyList()
                 Column(modifier = Modifier.fillMaxSize()) {
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(albumPhotos.size) { index ->
-                            val photo = albumPhotos[index]
-                            PhotoRow(
-                                photo = photo,
-                                timelineViewModel = timelineViewModel,
-                                displayName = userNames[photo.uploaderUid] ?: photo.uploaderUid,
-                                onClick = { selectedPhotoIndex = index }
-                            )
+                    if (viewMode == ViewMode.GRID) {
+                        var gridColumns by remember { mutableStateOf(3) }
+                        var scale by remember { mutableStateOf(1f) }
+        
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(gridColumns),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTransformGestures { _, _, zoom, _ ->
+                                        scale *= zoom
+                                        if (scale > 1.3f && gridColumns > 2) {
+                                            gridColumns--
+                                            scale = 1f
+                                        } else if (scale < 0.7f && gridColumns < 6) {
+                                            gridColumns++
+                                            scale = 1f
+                                        }
+                                    }
+                                },
+                            contentPadding = PaddingValues(bottom = 80.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            items(albumPhotos) { photo ->
+                                val isSelected = photo.photoId in selectedPhotoIds
+                                Box(
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .combinedClickable(
+                                            onClick = {
+                                                if (selectedPhotoIds.isNotEmpty()) timelineViewModel.toggleSelection(photo.photoId)
+                                                else {
+                                                    selectedPhotoIndex = albumPhotos.indexOf(photo)
+                                                }
+                                            },
+                                            onLongClick = {
+                                                if (isAdmin) timelineViewModel.toggleSelection(photo.photoId)
+                                            }
+                                        )
+                                ) {
+                                    TelegramAsyncImage(
+                                        photo = photo,
+                                        timelineViewModel = timelineViewModel,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    if (isSelected) {
+                                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.4f))) 
+                                        Icon(
+                                            Icons.Default.CheckCircle, 
+                                            contentDescription = null, 
+                                            tint = MaterialTheme.colorScheme.primary, 
+                                            modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        item { Spacer(modifier = Modifier.height(80.dp)) }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(albumPhotos.size) { index ->
+                                val photo = albumPhotos[index]
+                                PhotoRow(
+                                    photo = photo,
+                                    timelineViewModel = timelineViewModel,
+                                    displayName = userNames[photo.uploaderUid] ?: photo.uploaderUid,
+                                    isSelected = photo.photoId in selectedPhotoIds,
+                                    isAdmin = isAdmin,
+                                    onClick = { 
+                                        if (selectedPhotoIds.isNotEmpty()) {
+                                            timelineViewModel.toggleSelection(photo.photoId)
+                                        } else {
+                                            selectedPhotoIndex = index 
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (isAdmin) timelineViewModel.toggleSelection(photo.photoId)
+                                    }
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(80.dp)) }
+                        }
                     }
                 }
             } else {
@@ -296,11 +452,30 @@ fun TimelineScreen(
                 ) {
                     items(grouped.keys.toList()) { groupKey ->
                         val groupPhotos = grouped[groupKey] ?: emptyList()
+                        val isGroupSelected = groupPhotos.any { it.photoId in selectedPhotoIds }
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { selectedGroupKey = groupKey }
+                                .combinedClickable(
+                                    onClick = {
+                                        if (selectedPhotoIds.isNotEmpty()) {
+                                            groupPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
+                                        } else {
+                                            selectedGroupKey = groupKey
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (isAdmin) {
+                                            groupPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
+                                        }
+                                    }
+                                )
                                 .padding(8.dp)
+                                .background(
+                                    if (isGroupSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    else Color.Transparent,
+                                    RoundedCornerShape(12.dp)
+                                )
                         ) {
                             AlbumCollageThumbnail(
                                 photos = groupPhotos,
@@ -356,7 +531,7 @@ fun TimelineScreen(
                         tag = finalTag
                     )
                 } else if (pendingUris.isNotEmpty()) {
-                    photoPickerViewModel.enqueuePhotos(
+                    photoPickerViewModel.requestUpload(
                         tripId = tripId,
                         uris = pendingUris,
                         tag = finalTag
@@ -395,43 +570,137 @@ fun TimelineScreen(
 }
 
 @Composable
-private fun UploadProgressBar(progress: UploadProgress) {
+private fun UploadProgressBar(
+    progress: UploadProgress,
+    onCancel: () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         color = MaterialTheme.colorScheme.secondaryContainer,
         shadowElevation = 8.dp
     ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    progress = { if (progress.total > 0) progress.finished.toFloat() / progress.total else 0f },
-                    modifier = Modifier.size(36.dp),
-                    strokeWidth = 3.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-                Text(
-                    text = "${progress.percentage}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
+        Column {
+            Row(
+                modifier = Modifier
+                    .clickable { if (!progress.isPreparing && progress.totalBatches > 1) isExpanded = !isExpanded }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (progress.isPreparing) {
+                    // Indeterminate spinner during preparation
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    val fraction = if (progress.total > 0) {
+                        val f = progress.uploaded.toFloat() / progress.total
+                        if (f.isNaN() || f.isInfinite()) 0f else f.coerceIn(0f, 1f)
+                    } else 0f
+
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier.size(36.dp),
+                            strokeWidth = 3.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Text(
+                            text = "${progress.percentage}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    if (progress.isPreparing) {
+                        Text(
+                            text = "Preparing upload...",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${progress.total} photos found so far",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+                    } else {
+                        Text(
+                            text = if (progress.totalBatches > 1) {
+                                "Uploading Batch ${progress.currentBatch} of ${progress.totalBatches}"
+                            } else {
+                                "Uploading Photos"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${progress.uploaded} of ${progress.total} photos completed",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                if (!progress.isPreparing && progress.totalBatches > 1) {
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand"
+                        )
+                    }
+                }
+                IconButton(onClick = onCancel) {
+                    Icon(Icons.Default.Close, contentDescription = "Cancel Upload")
+                }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = "Uploading Photos",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "${progress.finished} of ${progress.total} completed",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                )
+
+            AnimatedVisibility(visible = isExpanded && !progress.isPreparing && progress.totalBatches > 1) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                ) {
+                    repeat(progress.totalBatches) { i ->
+                        val bNum = i + 1
+                        val status = when {
+                            bNum < progress.currentBatch -> "✓ Done"
+                            bNum == progress.currentBatch -> "Uploading (${progress.batchUploaded}/${progress.batchSize})..."
+                            else -> "Pending"
+                        }
+                        val color = when {
+                            bNum < progress.currentBatch -> MaterialTheme.colorScheme.primary
+                            bNum == progress.currentBatch -> MaterialTheme.colorScheme.secondary
+                            else -> MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.4f)
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 48.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Batch $bNum",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (bNum == progress.currentBatch) FontWeight.Bold else FontWeight.Normal
+                            )
+                            Text(
+                                text = status,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = color,
+                                fontWeight = if (bNum == progress.currentBatch) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -549,20 +818,37 @@ private fun PhotoRow(
     photo: PhotoMeta,
     timelineViewModel: TimelineViewModel,
     displayName: String = photo.uploaderUid,
-    onClick: () -> Unit
+    isSelected: Boolean = false,
+    isAdmin: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                             else MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
             TelegramAsyncImage(
                 photo = photo,
                 timelineViewModel = timelineViewModel,
@@ -597,8 +883,9 @@ private fun PhotoRow(
                     )
                 }
 
+                val sizeText = photo.sizeBytes?.let { " • ${String.format(java.util.Locale.US, "%.1f", it / (1024f * 1024f))} MB" } ?: ""
                 Text(
-                    text = formatTimestamp(photo.timestamp),
+                    text = "${formatTimestamp(photo.timestamp)}$sizeText",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -834,7 +1121,8 @@ private fun PhotoPagerOverlay(
     isAdmin: Boolean,
     onClose: () -> Unit
 ) {
-    val pagerState = rememberPagerState { photoList.size }
+    val selectedPhotoIds by timelineViewModel.selectedPhotoIds.collectAsState()
+    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { photoList.size })
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
