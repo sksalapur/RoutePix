@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.aspectRatio
@@ -32,7 +33,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -1125,6 +1128,8 @@ private fun PhotoPagerOverlay(
     val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { photoList.size })
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    
+    var isZoomed by remember { mutableStateOf(false) }
 
     LaunchedEffect(initialIndex) {
         pagerState.scrollToPage(initialIndex)
@@ -1139,15 +1144,69 @@ private fun PhotoPagerOverlay(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            pageSpacing = 16.dp
+            pageSpacing = 16.dp,
+            userScrollEnabled = !isZoomed
         ) { page ->
-            TelegramAsyncImage(
-                photo = photoList[page],
-                timelineViewModel = timelineViewModel,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+            var scale by remember { mutableStateOf(1f) }
+            var offset by remember { mutableStateOf(Offset.Zero) }
+
+            LaunchedEffect(scale) {
+                isZoomed = scale > 1f
+            }
+
+            LaunchedEffect(pagerState.isScrollInProgress) {
+                if (pagerState.isScrollInProgress) {
+                    scale = 1f
+                    offset = Offset.Zero
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(page) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            if (scale > 1f) {
+                                val maxX = (size.width * (scale - 1)) / 2
+                                val maxY = (size.height * (scale - 1)) / 2
+                                offset = Offset(
+                                    x = (offset.x + pan.x * scale).coerceIn(-maxX, maxX),
+                                    y = (offset.y + pan.y * scale).coerceIn(-maxY, maxY)
+                                )
+                            } else {
+                                offset = Offset.Zero
+                            }
+                        }
+                    }
+                    .pointerInput(page) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                if (scale > 1f) {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                } else {
+                                    scale = 2.5f
+                                }
+                            }
+                        )
+                    }
+            ) {
+                TelegramAsyncImage(
+                    photo = photoList[page],
+                    timelineViewModel = timelineViewModel,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
+                        },
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
 
         Row(

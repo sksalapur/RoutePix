@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,7 +46,7 @@ class AuthViewModel : ViewModel() {
                         "uid" to uid,
                         "displayName" to (user?.displayName ?: "Traveler")
                     )
-                    firestore.collection("users").document(uid).set(userData)
+                    firestore.collection("users").document(uid).set(userData, SetOptions.merge())
                 }
                 _authState.value = AuthState.Success(uid)
             }

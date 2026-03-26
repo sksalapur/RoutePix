@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,8 +46,10 @@ fun SettingsScreen(
     var displayName by remember(uiState.user) { mutableStateOf(uiState.user?.displayName ?: "") }
     var botToken by remember(uiState.user) { mutableStateOf(uiState.user?.telegramBotToken ?: "") }
     var chatId by remember(uiState.user) { mutableStateOf(uiState.user?.telegramChatId ?: "") }
+    var backupOnCellular by remember(uiState.user) { mutableStateOf(uiState.user?.backupOnCellular ?: false) }
     
     var isEditing by remember { mutableStateOf(false) }
+    var showTelegramGuide by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -63,6 +66,27 @@ fun SettingsScreen(
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
         }
+    }
+
+    if (showTelegramGuide) {
+        AlertDialog(
+            onDismissRequest = { showTelegramGuide = false },
+            title = { Text("How to get Telegram Credentials") },
+            text = {
+                Column {
+                    Text("1. Search for @BotFather in Telegram.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("2. Send /newbot and follow prompts to get your Bot Token.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("3. Search for @userinfobot and send any message to get your Chat ID.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTelegramGuide = false }) {
+                    Text("Got it")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -115,7 +139,12 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             SettingsCard(
-                title = "Telegram Bot Configuration"
+                title = "Telegram Bot Configuration",
+                action = {
+                    IconButton(onClick = { showTelegramGuide = true }) {
+                        Icon(Icons.Default.Info, contentDescription = "Help")
+                    }
+                }
             ) {
                 Text(
                     "These credentials will be used for all your trips.",
@@ -144,11 +173,31 @@ fun SettingsScreen(
 
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            SettingsCard(title = "Network Preferences") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                        Text("Backup on Cellular", fontWeight = FontWeight.SemiBold)
+                        Text("Allow uploading photos when Wi-Fi is unavailable", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = backupOnCellular,
+                        onCheckedChange = { backupOnCellular = it },
+                        enabled = isEditing
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             if (isEditing) {
                 Button(
-                    onClick = { viewModel.saveSettings(displayName, botToken, chatId) },
+                    onClick = { viewModel.saveSettings(displayName, botToken, chatId, backupOnCellular) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
                     enabled = !uiState.isSaving

@@ -340,7 +340,18 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    private fun enqueueWorker(tripId: String) {
+    private suspend fun enqueueWorker(tripId: String) {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        var useCellular = false
+        if (uid != null) {
+            try {
+                val doc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(uid).get().await()
+                useCellular = doc.getBoolean("backupOnCellular") ?: false
+            } catch (e: Exception) { }
+        }
+        val networkType = if (useCellular) NetworkType.CONNECTED else NetworkType.UNMETERED
+
         val workRequest = OneTimeWorkRequestBuilder<PhotoUploadWorker>()
             .setInputData(
                 workDataOf(
@@ -349,7 +360,7 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             )
             .setConstraints(
                 Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiredNetworkType(networkType)
                     .build()
             )
             .addTag("upload_$tripId")

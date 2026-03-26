@@ -38,6 +38,7 @@ class TripHomeViewModel : ViewModel() {
 
     private fun loadUserProfile() {
         viewModelScope.launch {
+            repository.syncLegacyInvites()
             val user = userRepository.getCurrentUser()
             _uiState.value = _uiState.value.copy(
                 displayName = user?.displayName?.ifBlank { null } 

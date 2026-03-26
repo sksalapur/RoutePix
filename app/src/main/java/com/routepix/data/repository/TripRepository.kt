@@ -52,19 +52,15 @@ class TripRepository(
         )
 
         firestore.collection("trips").document(tripId).set(trip).await()
+        firestore.collection("invites").document(inviteCode).set(mapOf("tripId" to tripId)).await()
         return tripId
     }
 
     suspend fun joinTrip(inviteCode: String): String {
         val uid = auth.currentUser?.uid ?: throw IllegalStateException("User not logged in")
-        val snap = firestore.collection("trips")
-            .whereEqualTo("inviteCode", inviteCode)
-            .get().await()
-
-        if (snap.isEmpty) throw IllegalArgumentException("Invalid invite code")
-        
-        val doc = snap.documents.first()
-        val tripId = doc.id
+        val inviteDoc = firestore.collection("invites").document(inviteCode).get().await()
+        if (!inviteDoc.exists()) throw IllegalArgumentException("Invalid invite code")
+        val tripId = inviteDoc.getString("tripId") ?: throw IllegalArgumentException("Invalid invite code")
         
         firestore.collection("trips").document(tripId)
             .update("memberUids", com.google.firebase.firestore.FieldValue.arrayUnion(uid))
@@ -136,6 +132,20 @@ class TripRepository(
             }
         }
         batch.commit().await()
+    }
+
+    suspend fun syncLegacyInvites() {
+        val uid = auth.currentUser?.uid ?: return
+        try {
+            val trips = firestore.collection("trips").whereEqualTo("adminUid", uid).get().await()
+            for (doc in trips.documents) {
+                val tripId = doc.id
+                val inviteCode = doc.getString("inviteCode")
+                if (!inviteCode.isNullOrEmpty()) {
+                    firestore.collection("invites").document(inviteCode).set(mapOf("tripId" to tripId)).await()
+                }
+            }
+        } catch (_: Exception) { }
     }
 }
 

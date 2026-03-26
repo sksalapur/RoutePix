@@ -11,17 +11,29 @@ service cloud.firestore {
       allow write: if isAuth() && request.auth.uid == userId;
     }
     
+    match /invites/{inviteCode} {
+      allow get, create: if isAuth();
+    }
+
     match /trips/{tripId} {
-      allow read: if isAuth() && request.auth.uid in resource.data.memberUids;
+      allow read: if isAuth() && (request.auth.uid in resource.data.memberUids || request.auth.uid == resource.data.adminUid);
       allow create: if isAuth();
       allow update: if isAuth() && (
         request.auth.uid == resource.data.adminUid || 
-        request.auth.uid in resource.data.memberUids
+        request.auth.uid in resource.data.memberUids ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids']) &&
+          request.auth.uid in request.resource.data.memberUids &&
+          request.resource.data.memberUids.hasAll(resource.data.memberUids)
+        )
       );
       allow delete: if isAuth() && request.auth.uid == resource.data.adminUid;
       
       match /photos/{photoId} {
-        allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberUids;
+        allow read, create: if isAuth() && (
+          request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberUids ||
+          request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.adminUid
+        );
         allow delete: if isAuth() && (
           request.auth.uid == resource.data.uploaderUid || 
           request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.adminUid

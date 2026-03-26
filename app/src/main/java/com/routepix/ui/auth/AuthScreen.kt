@@ -11,7 +11,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.translate
+import kotlin.math.absoluteValue
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +55,16 @@ fun AuthScreen(
     val authState by authViewModel.authState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val infiniteTransition = rememberInfiniteTransition()
+    val scrollOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(25000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    )
 
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -92,12 +114,53 @@ fun AuthScreen(
                 .padding(padding),
             contentAlignment = Alignment.Center
         ) {
+            
+            val c1 = MaterialTheme.colorScheme.primaryContainer
+            val c2 = MaterialTheme.colorScheme.secondaryContainer
+            val c3 = MaterialTheme.colorScheme.tertiaryContainer
+            val c4 = MaterialTheme.colorScheme.surfaceVariant
+            val c5 = MaterialTheme.colorScheme.primary
+            val c6 = MaterialTheme.colorScheme.secondary
+            val c7 = MaterialTheme.colorScheme.tertiary
+
+            val colors = listOf(c1, c2, c3, c4, c5, c6, c7)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val boxWidth = 140.dp.toPx()
+                val spacing = 16.dp.toPx()
+                val totalW = boxWidth + spacing
+                // Move from top-right to bottom-left
+                val shift = scrollOffset % totalW
+                translate(left = -shift, top = shift) {
+                    for (i in -2..((size.width / totalW).toInt() + 3)) {
+                        for (j in -4..((size.height / totalW).toInt() + 2)) {
+                            // Pseudo-random but deterministic size multiplier for staggered grid
+                            val randVariant = (i * 17 + j * 31).absoluteValue % 3
+                            val boxHeight = boxWidth * (1f + randVariant * 0.5f)
+                            
+                            val colorIdx = (i * 7 + j * 11).absoluteValue % colors.size
+                            val topOffset = j * totalW + (if (i % 2 != 0) totalW / 2 else 0f)
+
+                            drawRoundRect(
+                                color = colors[colorIdx].copy(alpha = 0.4f),
+                                topLeft = Offset(i * totalW, topOffset),
+                                size = Size(boxWidth, boxHeight),
+                                cornerRadius = CornerRadius(16.dp.toPx())
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Content layer
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                    .padding(32.dp)
             ) {
                 Text(
                     text = "RoutePix",
@@ -129,7 +192,7 @@ fun AuthScreen(
                             .height(52.dp)
                     ) {
                         Text(
-                            text = "Sign in with Google",
+                            text = "Continue with Google",
                             style = MaterialTheme.typography.labelLarge
                         )
                     }
