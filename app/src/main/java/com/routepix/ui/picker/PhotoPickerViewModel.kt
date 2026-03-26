@@ -108,32 +108,32 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             var skipped = 0
             var failed = 0
 
-            val chunks = uris.chunked(CHUNK_SIZE)
+        val chunks = uris.chunked(CHUNK_SIZE)
 
-            for (chunk in chunks) {
-                val results = withContext(Dispatchers.IO) {
-                    chunk.map { uri -> processPhoto(uri, tripId, tag) }
-                }
-
-                for (result in results) {
-                    when (result) {
-                        is EnqueueResult.Queued -> {
-                            enqueueWorker(tripId, result.photoId)
-                            queued++
-                        }
-                        is EnqueueResult.Duplicate -> skipped++
-                        is EnqueueResult.Failed -> failed++
-                    }
-                }
-
-                _queueState.value = UploadQueueState(
-                    totalSelected = uris.size,
-                    queued = queued,
-                    duplicatesSkipped = skipped,
-                    failed = failed,
-                    isProcessing = true
-                )
+        for (chunk in chunks) {
+            val results = withContext(Dispatchers.IO) {
+                chunk.map { uri -> processPhoto(uri, tripId, tag) }
             }
+
+            for (result in results) {
+                when (result) {
+                    is EnqueueResult.Queued -> queued++
+                    is EnqueueResult.Duplicate -> skipped++
+                    is EnqueueResult.Failed -> failed++
+                }
+            }
+
+            // Enqueue batch worker after inserting the chunk
+            if (queued > 0) enqueueWorker(tripId)
+
+            _queueState.value = UploadQueueState(
+                totalSelected = uris.size,
+                queued = queued,
+                duplicatesSkipped = skipped,
+                failed = failed,
+                isProcessing = true
+            )
+        }
 
             _queueState.value = _queueState.value.copy(isProcessing = false)
             Log.d(TAG, "Enqueue complete: queued=$queued, skipped=$skipped, failed=$failed out of ${uris.size}")
@@ -176,12 +176,11 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    private fun enqueueWorker(tripId: String, photoId: Int) {
+    private fun enqueueWorker(tripId: String) {
         val workRequest = OneTimeWorkRequestBuilder<PhotoUploadWorker>()
             .setInputData(
                 workDataOf(
-                    PhotoUploadWorker.KEY_TRIP_ID to tripId,
-                    PhotoUploadWorker.KEY_QUEUED_PHOTO_ID to photoId
+                    PhotoUploadWorker.KEY_TRIP_ID to tripId
                 )
             )
             .setConstraints(

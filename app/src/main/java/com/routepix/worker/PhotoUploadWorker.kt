@@ -1,23 +1,23 @@
 package com.routepix.worker
 
 import android.content.Context
-import android.location.Geocoder
 import android.net.Uri
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.routepix.data.local.QueuedPhoto
+import com.routepix.data.local.QueuedPhotoDao
 import com.routepix.data.local.RoutepixDatabase
 import com.routepix.data.model.PhotoMeta
-import com.routepix.data.model.Trip
 import com.routepix.data.remote.RetrofitClient
-import com.routepix.security.SecurityManager
+import com.routepix.data.remote.TelegramApi
 import com.routepix.util.PhotoUtils
 import kotlinx.coroutines.tasks.await
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.Locale
 import java.util.UUID
 
 
@@ -28,38 +28,65 @@ class PhotoUploadWorker(
 
     companion object {
         const val KEY_TRIP_ID = "TRIP_ID"
-        const val KEY_QUEUED_PHOTO_ID = "QUEUED_PHOTO_ID"
         private const val MAX_RETRIES = 3
+        private const val TAG = "PhotoUploadWorker"
     }
 
     override suspend fun doWork(): Result {
         val tripId = inputData.getString(KEY_TRIP_ID) ?: return Result.failure()
-        val photoId = inputData.getInt(KEY_QUEUED_PHOTO_ID, -1)
-        if (photoId == -1) return Result.failure()
 
-        return try {
-            execute(tripId, photoId)
-        } catch (e: Exception) {
-            android.util.Log.e("PhotoUploadWorker", "Upload failed", e)
-            if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()
-        }
-    }
-
-    private suspend fun execute(tripId: String, queuedPhotoId: Int): Result {
-        val TAG = "PhotoUploadWorker"
         val dao = RoutepixDatabase.getInstance(applicationContext).queuedPhotoDao()
         val telegramApi = RetrofitClient.telegramApi
 
-        val photo = dao.getById(queuedPhotoId) ?: run {
-            android.util.Log.e(TAG, "Queued photo $queuedPhotoId not found in DB")
-            return Result.failure()
+        val initialPending = dao.getPendingForTrip(tripId)
+        val initialTotal = initialPending.size
+        if (initialTotal == 0) return Result.success()
+
+        var hasFailures = false
+
+        while (true) {
+            val pendingPhotos = dao.getPendingForTrip(tripId)
+            if (pendingPhotos.isEmpty()) break
+
+            val photo = pendingPhotos.first()
+            val currentProgress = initialTotal - pendingPhotos.size
+            setProgress(workDataOf("progress" to currentProgress, "total" to initialTotal))
+
+            try {
+                val success = executeSingle(photo, tripId, telegramApi)
+                if (success) {
+                    dao.deleteById(photo.id)
+                } else {
+                    hasFailures = true
+                    break
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Upload failed for photo ${photo.id}", e)
+                hasFailures = true
+                break
+            }
         }
+        
+        val finalPending = dao.getPendingForTrip(tripId).size
+        val finalProgress = initialTotal - finalPending
+        setProgress(workDataOf("progress" to finalProgress, "total" to initialTotal))
+
+        return if (hasFailures) {
+            if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()
+        } else {
+            Result.success()
+        }
+    }
+
+    private suspend fun executeSingle(
+        photo: QueuedPhoto, 
+        tripId: String, 
+        telegramApi: TelegramApi
+    ): Boolean {
         val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: run {
             android.util.Log.e(TAG, "No authenticated user")
-            return Result.failure()
+            return false
         }
-
-        android.util.Log.d(TAG, "Starting upload for trip=$tripId, photo=$queuedPhotoId, user=$currentUid")
 
         val tripDoc = FirebaseFirestore.getInstance()
             .collection("trips")
@@ -70,14 +97,11 @@ class PhotoUploadWorker(
         var botToken = tripDoc.getString("telegramBotToken")
         var chatId = tripDoc.getString("telegramChatId")
 
-        android.util.Log.d(TAG, "Trip credentials: botToken=${if (botToken.isNullOrBlank()) "MISSING" else "present"}, chatId=${if (chatId.isNullOrBlank()) "MISSING" else "present"}")
-
         if (botToken.isNullOrBlank() || chatId.isNullOrBlank()) {
             val adminUid = tripDoc.getString("adminUid") ?: run {
                 android.util.Log.e(TAG, "Trip has no adminUid")
-                return Result.failure()
+                return false
             }
-            android.util.Log.d(TAG, "Falling back to admin user doc: $adminUid")
             try {
                 val adminDoc = FirebaseFirestore.getInstance()
                     .collection("users")
@@ -86,7 +110,6 @@ class PhotoUploadWorker(
                     .await()
                 botToken = adminDoc.getString("telegramBotToken")
                 chatId = adminDoc.getString("telegramChatId")
-                android.util.Log.d(TAG, "Admin credentials: botToken=${if (botToken.isNullOrBlank()) "MISSING" else "present"}, chatId=${if (chatId.isNullOrBlank()) "MISSING" else "present"}")
 
                 if (!botToken.isNullOrBlank() && !chatId.isNullOrBlank()) {
                     FirebaseFirestore.getInstance()
@@ -96,7 +119,6 @@ class PhotoUploadWorker(
                             "telegramBotToken" to botToken,
                             "telegramChatId" to chatId
                         ))
-                    android.util.Log.d(TAG, "Cached credentials into trip document")
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Failed to read admin user doc", e)
@@ -105,7 +127,7 @@ class PhotoUploadWorker(
 
         if (botToken.isNullOrBlank() || chatId.isNullOrBlank()) {
             android.util.Log.e(TAG, "No credentials available, aborting upload")
-            return Result.failure()
+            return false
         }
 
         val imageBytes = PhotoUtils.uriToByteArray(applicationContext, Uri.parse(photo.localUri))
@@ -122,15 +144,12 @@ class PhotoUploadWorker(
         )
 
         if (!response.ok || response.result == null) {
-            return Result.retry()
+            return false
         }
 
-        val photoSizes = response.result.photo ?: return Result.failure()
-        val bestPhoto = photoSizes.maxByOrNull { it.width * it.height }
-            ?: return Result.failure()
+        val photoSizes = response.result.photo ?: return false
+        val bestPhoto = photoSizes.maxByOrNull { it.width * it.height } ?: return false
         val fileId = bestPhoto.fileId
-
-        telegramApi.getFile(token = botToken, fileId = fileId)
 
         val photoMeta = PhotoMeta(
             photoId = UUID.randomUUID().toString(),
@@ -149,11 +168,7 @@ class PhotoUploadWorker(
             .set(photoMeta)
             .await()
 
-        dao.deleteById(photo.id)
-
-        return Result.success()
+        return true
     }
-
-
 }
 

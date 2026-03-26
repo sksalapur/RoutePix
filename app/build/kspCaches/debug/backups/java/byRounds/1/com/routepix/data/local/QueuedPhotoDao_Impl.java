@@ -320,6 +320,71 @@ public final class QueuedPhotoDao_Impl implements QueuedPhotoDao {
     }, $completion);
   }
 
+  @Override
+  public Object getPendingForTrip(final String tripId,
+      final Continuation<? super List<QueuedPhoto>> $completion) {
+    final String _sql = "SELECT * FROM queued_photos WHERE tripId = ? ORDER BY timestamp ASC";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindString(_argIndex, tripId);
+    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
+    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<QueuedPhoto>>() {
+      @Override
+      @NonNull
+      public List<QueuedPhoto> call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfLocalUri = CursorUtil.getColumnIndexOrThrow(_cursor, "localUri");
+          final int _cursorIndexOfTripId = CursorUtil.getColumnIndexOrThrow(_cursor, "tripId");
+          final int _cursorIndexOfTimestamp = CursorUtil.getColumnIndexOrThrow(_cursor, "timestamp");
+          final int _cursorIndexOfLat = CursorUtil.getColumnIndexOrThrow(_cursor, "lat");
+          final int _cursorIndexOfLng = CursorUtil.getColumnIndexOrThrow(_cursor, "lng");
+          final int _cursorIndexOfTag = CursorUtil.getColumnIndexOrThrow(_cursor, "tag");
+          final int _cursorIndexOfMd5Hash = CursorUtil.getColumnIndexOrThrow(_cursor, "md5Hash");
+          final List<QueuedPhoto> _result = new ArrayList<QueuedPhoto>(_cursor.getCount());
+          while (_cursor.moveToNext()) {
+            final QueuedPhoto _item;
+            final int _tmpId;
+            _tmpId = _cursor.getInt(_cursorIndexOfId);
+            final String _tmpLocalUri;
+            _tmpLocalUri = _cursor.getString(_cursorIndexOfLocalUri);
+            final String _tmpTripId;
+            _tmpTripId = _cursor.getString(_cursorIndexOfTripId);
+            final long _tmpTimestamp;
+            _tmpTimestamp = _cursor.getLong(_cursorIndexOfTimestamp);
+            final Double _tmpLat;
+            if (_cursor.isNull(_cursorIndexOfLat)) {
+              _tmpLat = null;
+            } else {
+              _tmpLat = _cursor.getDouble(_cursorIndexOfLat);
+            }
+            final Double _tmpLng;
+            if (_cursor.isNull(_cursorIndexOfLng)) {
+              _tmpLng = null;
+            } else {
+              _tmpLng = _cursor.getDouble(_cursorIndexOfLng);
+            }
+            final String _tmpTag;
+            if (_cursor.isNull(_cursorIndexOfTag)) {
+              _tmpTag = null;
+            } else {
+              _tmpTag = _cursor.getString(_cursorIndexOfTag);
+            }
+            final String _tmpMd5Hash;
+            _tmpMd5Hash = _cursor.getString(_cursorIndexOfMd5Hash);
+            _item = new QueuedPhoto(_tmpId,_tmpLocalUri,_tmpTripId,_tmpTimestamp,_tmpLat,_tmpLng,_tmpTag,_tmpMd5Hash);
+            _result.add(_item);
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+          _statement.release();
+        }
+      }
+    }, $completion);
+  }
+
   @NonNull
   public static List<Class<?>> getRequiredConverters() {
     return Collections.emptyList();

@@ -23,5 +23,8 @@ interface QueuedPhotoDao {
 
     @Query("SELECT * FROM queued_photos WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): QueuedPhoto?
+
+    @Query("SELECT * FROM queued_photos WHERE tripId = :tripId ORDER BY timestamp ASC")
+    suspend fun getPendingForTrip(tripId: String): List<QueuedPhoto>
 }
 
