@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-35:12
-INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-35:12
-INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-35:12
-INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-35:12
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-37:12
+INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-37:12
+INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-37:12
+INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:2:1-37:12
 MERGED from [androidx.navigation:navigation-common:2.8.5] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\554c5d8dc6536a9d46012e2553522ea3\transformed\navigation-common-2.8.5\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-runtime:2.8.5] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9c7c023267a8cfbd06bf2dbcdde24611\transformed\navigation-runtime-2.8.5\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-common-ktx:2.8.5] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\539fb01b15aa9e7e4158b8364ea734ac\transformed\navigation-common-ktx-2.8.5\AndroidManifest.xml:2:1-7:12
@@ -34,12 +34,9 @@ MERGED from [androidx.credentials:credentials-play-services-auth:1.2.0-rc01] C:\
 MERGED from [com.google.android.gms:play-services-auth:21.3.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\27b3c2afd77aef8f6f34122fe8502fb6\transformed\play-services-auth-21.3.0\AndroidManifest.xml:17:1-40:12
 MERGED from [com.google.android.gms:play-services-auth-api-phone:18.0.2] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\ee419f8d4de64cd85b39994857781007\transformed\play-services-auth-api-phone-18.0.2\AndroidManifest.xml:2:1-7:12
 MERGED from [com.google.android.gms:play-services-auth-base:18.0.10] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0094a13da2221cbea7c1a8ee9b86ffb9\transformed\play-services-auth-base-18.0.10\AndroidManifest.xml:2:1-7:12
-MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:2:1-18:12
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:15:1-39:12
 MERGED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:2:1-18:12
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:2:1-26:12
-MERGED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:15:1-34:12
-MERGED from [com.google.firebase:firebase-appcheck-interop:17.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\8a8c8e53451e314aee61620c5978a5f6\transformed\firebase-appcheck-interop-17.1.0\AndroidManifest.xml:15:1-23:12
+MERGED from [com.google.firebase:firebase-appcheck-interop:17.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0097d0c314eafa26b411fabdf16f99a1\transformed\firebase-appcheck-interop-17.0.0\AndroidManifest.xml:15:1-25:12
 MERGED from [com.google.firebase:firebase-database-collection:18.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\e28011ecd377d268b30148b47917a953\transformed\firebase-database-collection-18.0.1\AndroidManifest.xml:2:1-9:12
 MERGED from [com.google.android.gms:play-services-fido:20.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\671337547b99a4b5281616f421dc12a8\transformed\play-services-fido-20.1.0\AndroidManifest.xml:2:1-10:12
 MERGED from [com.google.android.gms:play-services-base:18.5.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1cf74e4767ddd35c87b08d6f16dcb2b7\transformed\play-services-base-18.5.0\AndroidManifest.xml:2:1-7:12
@@ -126,8 +123,6 @@ uses-permission#android.permission.INTERNET
 ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:6:5-67
 MERGED from [com.google.firebase:firebase-auth:23.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\4ed3b80024631e4fc69ebf6604fa0463\transformed\firebase-auth-23.1.0\AndroidManifest.xml:25:5-67
 MERGED from [com.google.firebase:firebase-auth:23.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\4ed3b80024631e4fc69ebf6604fa0463\transformed\firebase-auth-23.1.0\AndroidManifest.xml:25:5-67
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:24:5-67
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:24:5-67
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:11:5-67
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:11:5-67
 MERGED from [com.google.android.recaptcha:recaptcha:18.5.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f474c9c86383e3c1e7004b9c1c478d2\transformed\recaptcha-18.5.1\AndroidManifest.xml:7:5-67
@@ -144,9 +139,19 @@ uses-permission#android.permission.READ_MEDIA_IMAGES
 ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:12:5-76
 	android:name
 		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:12:22-73
+uses-permission#android.permission.READ_MEDIA_VIDEO
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:13:5-75
+	android:name
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:13:22-72
+uses-permission#android.permission.READ_EXTERNAL_STORAGE
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:14:5-107
+	android:maxSdkVersion
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:14:78-104
+	android:name
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:14:22-77
 application
-ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:14:5-33:19
-INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:14:5-33:19
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:16:5-35:19
+INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:16:5-35:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.7.6] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\55fa1914a2c1830518ece6fc92f1bb88\transformed\ui-tooling-release\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.7.6] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\55fa1914a2c1830518ece6fc92f1bb88\transformed\ui-tooling-release\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.7.6] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9e3fb63f7d04ef2861e348024bcf1792\transformed\ui-test-manifest-1.7.6\AndroidManifest.xml:22:5-26:19
@@ -159,18 +164,12 @@ MERGED from [androidx.credentials:credentials-play-services-auth:1.2.0-rc01] C:\
 MERGED from [androidx.credentials:credentials-play-services-auth:1.2.0-rc01] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\c8a3f37afe1e3955704a950a9c412dde\transformed\credentials-play-services-auth-1.2.0-rc01\AndroidManifest.xml:23:5-42:19
 MERGED from [com.google.android.gms:play-services-auth:21.3.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\27b3c2afd77aef8f6f34122fe8502fb6\transformed\play-services-auth-21.3.0\AndroidManifest.xml:22:5-38:19
 MERGED from [com.google.android.gms:play-services-auth:21.3.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\27b3c2afd77aef8f6f34122fe8502fb6\transformed\play-services-auth-21.3.0\AndroidManifest.xml:22:5-38:19
-MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:8:5-16:19
-MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:8:5-16:19
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:26:5-37:19
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:26:5-37:19
 MERGED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:8:5-16:19
 MERGED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:8:5-16:19
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:13:5-24:19
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:13:5-24:19
-MERGED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:21:5-32:19
-MERGED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:21:5-32:19
-MERGED from [com.google.firebase:firebase-appcheck-interop:17.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\8a8c8e53451e314aee61620c5978a5f6\transformed\firebase-appcheck-interop-17.1.0\AndroidManifest.xml:21:5-20
-MERGED from [com.google.firebase:firebase-appcheck-interop:17.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\8a8c8e53451e314aee61620c5978a5f6\transformed\firebase-appcheck-interop-17.1.0\AndroidManifest.xml:21:5-20
+MERGED from [com.google.firebase:firebase-appcheck-interop:17.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0097d0c314eafa26b411fabdf16f99a1\transformed\firebase-appcheck-interop-17.0.0\AndroidManifest.xml:23:5-20
+MERGED from [com.google.firebase:firebase-appcheck-interop:17.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0097d0c314eafa26b411fabdf16f99a1\transformed\firebase-appcheck-interop-17.0.0\AndroidManifest.xml:23:5-20
 MERGED from [com.google.android.gms:play-services-fido:20.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\671337547b99a4b5281616f421dc12a8\transformed\play-services-fido-20.1.0\AndroidManifest.xml:7:5-8:19
 MERGED from [com.google.android.gms:play-services-fido:20.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\671337547b99a4b5281616f421dc12a8\transformed\play-services-fido-20.1.0\AndroidManifest.xml:7:5-8:19
 MERGED from [com.google.android.gms:play-services-base:18.5.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1cf74e4767ddd35c87b08d6f16dcb2b7\transformed\play-services-base-18.5.0\AndroidManifest.xml:4:5-6:19
@@ -210,37 +209,37 @@ MERGED from [com.google.android.play:core-common:2.0.3] C:\Users\SKSAL\.gradle\c
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.15.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\c393ebf5e89ca5ca2e5e48c1c1a336ab\transformed\core-1.15.0\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:19:9-35
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:21:9-35
 	android:label
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:17:9-41
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:19:9-41
 	android:roundIcon
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:18:9-57
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:20:9-57
 	tools:targetApi
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:21:9-29
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:23:9-29
 	android:icon
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:16:9-52
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:18:9-52
 	android:allowBackup
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:15:9-35
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:17:9-35
 	android:theme
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:20:9-46
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:22:9-46
 activity#com.routepix.MainActivity
-ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:23:9-31:20
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:25:9-33:20
 	android:exported
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:25:13-36
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:27:13-36
 	android:theme
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:26:13-50
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:28:13-50
 	android:name
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:24:13-41
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:26:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:27:13-30:29
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:29:13-32:29
 action#android.intent.action.MAIN
-ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:28:17-69
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:30:17-69
 	android:name
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:28:25-66
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:30:25-66
 category#android.intent.category.LAUNCHER
-ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:29:17-77
+ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:31:17-77
 	android:name
-		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:29:27-74
+		ADDED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml:31:27-74
 uses-sdk
 INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from D:\PROJECTS\RoutePix\app\src\main\AndroidManifest.xml
@@ -305,18 +304,12 @@ MERGED from [com.google.android.gms:play-services-auth-api-phone:18.0.2] C:\User
 MERGED from [com.google.android.gms:play-services-auth-api-phone:18.0.2] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\ee419f8d4de64cd85b39994857781007\transformed\play-services-auth-api-phone-18.0.2\AndroidManifest.xml:5:5-44
 MERGED from [com.google.android.gms:play-services-auth-base:18.0.10] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0094a13da2221cbea7c1a8ee9b86ffb9\transformed\play-services-auth-base-18.0.10\AndroidManifest.xml:5:5-44
 MERGED from [com.google.android.gms:play-services-auth-base:18.0.10] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0094a13da2221cbea7c1a8ee9b86ffb9\transformed\play-services-auth-base-18.0.10\AndroidManifest.xml:5:5-44
-MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:5:5-44
-MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:5:5-44
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:19:5-44
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:19:5-44
 MERGED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:5:5-44
 MERGED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:5:5-44
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:6:5-44
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:6:5-44
-MERGED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:18:5-44
-MERGED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:18:5-44
-MERGED from [com.google.firebase:firebase-appcheck-interop:17.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\8a8c8e53451e314aee61620c5978a5f6\transformed\firebase-appcheck-interop-17.1.0\AndroidManifest.xml:18:5-44
-MERGED from [com.google.firebase:firebase-appcheck-interop:17.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\8a8c8e53451e314aee61620c5978a5f6\transformed\firebase-appcheck-interop-17.1.0\AndroidManifest.xml:18:5-44
+MERGED from [com.google.firebase:firebase-appcheck-interop:17.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0097d0c314eafa26b411fabdf16f99a1\transformed\firebase-appcheck-interop-17.0.0\AndroidManifest.xml:18:5-20:41
+MERGED from [com.google.firebase:firebase-appcheck-interop:17.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0097d0c314eafa26b411fabdf16f99a1\transformed\firebase-appcheck-interop-17.0.0\AndroidManifest.xml:18:5-20:41
 MERGED from [com.google.firebase:firebase-database-collection:18.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\e28011ecd377d268b30148b47917a953\transformed\firebase-database-collection-18.0.1\AndroidManifest.xml:5:5-7:41
 MERGED from [com.google.firebase:firebase-database-collection:18.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\e28011ecd377d268b30148b47917a953\transformed\firebase-database-collection-18.0.1\AndroidManifest.xml:5:5-7:41
 MERGED from [com.google.android.gms:play-services-fido:20.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\671337547b99a4b5281616f421dc12a8\transformed\play-services-fido-20.1.0\AndroidManifest.xml:5:5-44
@@ -483,16 +476,10 @@ service#com.google.firebase.components.ComponentDiscoveryService
 ADDED from [com.google.firebase:firebase-auth-ktx:23.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\fa071ec68187f7fa74b953bcc0a14743\transformed\firebase-auth-ktx-23.1.0\AndroidManifest.xml:8:9-14:19
 MERGED from [com.google.firebase:firebase-auth:23.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\4ed3b80024631e4fc69ebf6604fa0463\transformed\firebase-auth-23.1.0\AndroidManifest.xml:66:9-72:19
 MERGED from [com.google.firebase:firebase-auth:23.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\4ed3b80024631e4fc69ebf6604fa0463\transformed\firebase-auth-23.1.0\AndroidManifest.xml:66:9-72:19
-MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:9:9-15:19
-MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:9:9-15:19
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:27:9-36:19
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:27:9-36:19
 MERGED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:9:9-15:19
 MERGED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:9:9-15:19
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:14:9-23:19
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:14:9-23:19
-MERGED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:22:9-31:19
-MERGED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:22:9-31:19
 MERGED from [com.google.firebase:firebase-common-ktx:21.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\55269567cebf56a736cf3cb291c8c7ae\transformed\firebase-common-ktx-21.0.0\AndroidManifest.xml:9:9-15:19
 MERGED from [com.google.firebase:firebase-common-ktx:21.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\55269567cebf56a736cf3cb291c8c7ae\transformed\firebase-common-ktx-21.0.0\AndroidManifest.xml:9:9-15:19
 MERGED from [com.google.firebase:firebase-common:21.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\0a1835864cd50956d06f883adb1e950f\transformed\firebase-common-21.0.0\AndroidManifest.xml:30:9-38:19
@@ -513,8 +500,6 @@ ADDED from [com.google.firebase:firebase-auth-ktx:23.1.0] C:\Users\SKSAL\.gradle
 		ADDED from [com.google.firebase:firebase-auth-ktx:23.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\fa071ec68187f7fa74b953bcc0a14743\transformed\firebase-auth-ktx-23.1.0\AndroidManifest.xml:12:17-119
 uses-permission#android.permission.ACCESS_NETWORK_STATE
 ADDED from [com.google.firebase:firebase-auth:23.1.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\4ed3b80024631e4fc69ebf6604fa0463\transformed\firebase-auth-23.1.0\AndroidManifest.xml:26:5-79
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:23:5-79
-MERGED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:23:5-79
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:10:5-79
 MERGED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:10:5-79
 MERGED from [com.google.android.recaptcha:recaptcha:18.5.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f474c9c86383e3c1e7004b9c1c478d2\transformed\recaptcha-18.5.1\AndroidManifest.xml:8:5-79
@@ -629,24 +614,6 @@ ADDED from [com.google.android.gms:play-services-auth:21.3.0] C:\Users\SKSAL\.gr
 		ADDED from [com.google.android.gms:play-services-auth:21.3.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\27b3c2afd77aef8f6f34122fe8502fb6\transformed\play-services-auth-21.3.0\AndroidManifest.xml:36:13-107
 	android:name
 		ADDED from [com.google.android.gms:play-services-auth:21.3.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\27b3c2afd77aef8f6f34122fe8502fb6\transformed\play-services-auth-21.3.0\AndroidManifest.xml:34:13-89
-meta-data#com.google.firebase.components:com.google.firebase.storage.ktx.FirebaseStorageLegacyRegistrar
-ADDED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:12:13-14:85
-	android:value
-		ADDED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:14:17-82
-	android:name
-		ADDED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\9f4f3dfa5bc0ec5f55aacff0c180b721\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:13:17-125
-meta-data#com.google.firebase.components:com.google.firebase.storage.FirebaseStorageKtxRegistrar
-ADDED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:30:13-32:85
-	android:value
-		ADDED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:32:17-82
-	android:name
-		ADDED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:31:17-118
-meta-data#com.google.firebase.components:com.google.firebase.storage.StorageRegistrar
-ADDED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:33:13-35:85
-	android:value
-		ADDED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:35:17-82
-	android:name
-		ADDED from [com.google.firebase:firebase-storage:21.0.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\65cbad85eeebd28a91e111faaf27f0bc\transformed\firebase-storage-21.0.1\AndroidManifest.xml:34:17-107
 meta-data#com.google.firebase.components:com.google.firebase.firestore.ktx.FirebaseFirestoreLegacyRegistrar
 ADDED from [com.google.firebase:firebase-firestore-ktx:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\abc75289c39a72d841d6f790340e7e14\transformed\firebase-firestore-ktx-25.1.1\AndroidManifest.xml:12:13-14:85
 	android:value
@@ -665,18 +632,6 @@ ADDED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradl
 		ADDED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:22:17-82
 	android:name
 		ADDED from [com.google.firebase:firebase-firestore:25.1.1] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\970ba743ba7d7cf2c838e9e23237061c\transformed\firebase-firestore-25.1.1\AndroidManifest.xml:21:17-111
-meta-data#com.google.firebase.components:com.google.firebase.appcheck.FirebaseAppCheckKtxRegistrar
-ADDED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:25:13-27:85
-	android:value
-		ADDED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:27:17-82
-	android:name
-		ADDED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:26:17-120
-meta-data#com.google.firebase.components:com.google.firebase.appcheck.FirebaseAppCheckRegistrar
-ADDED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:28:13-30:85
-	android:value
-		ADDED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:30:17-82
-	android:name
-		ADDED from [com.google.firebase:firebase-appcheck:18.0.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1d7b27feb4da9368f985a68437106382\transformed\firebase-appcheck-18.0.0\AndroidManifest.xml:29:17-117
 activity#com.google.android.gms.common.api.GoogleApiActivity
 ADDED from [com.google.android.gms:play-services-base:18.5.0] C:\Users\SKSAL\.gradle\caches\8.11.1\transforms\1cf74e4767ddd35c87b08d6f16dcb2b7\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:9-173
 	android:exported

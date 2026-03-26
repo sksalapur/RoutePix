@@ -41,18 +41,6 @@ object PhotoUtils {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    
-    fun copyToCache(context: Context, uri: Uri, md5: String): String {
-        val cacheFile = java.io.File(context.cacheDir, "$md5.jpg")
-        if (!cacheFile.exists()) {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                cacheFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            } ?: throw IllegalArgumentException("Cannot open URI: $uri")
-        }
-        return Uri.fromFile(cacheFile).toString()
-    }
 
     
     fun uriToByteArray(context: Context, uri: Uri): ByteArray {

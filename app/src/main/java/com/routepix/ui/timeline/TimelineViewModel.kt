@@ -77,11 +77,13 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         .map { infoList ->
             if (infoList.isEmpty()) return@map UploadProgress()
             
-            val finished = infoList.count { it.state.isFinished }
-            val total = infoList.size
-            val active = infoList.any { !it.state.isFinished }
+            val running = infoList.filter { !it.state.isFinished }
+            val succeeded = infoList.count { it.state == androidx.work.WorkInfo.State.SUCCEEDED }
+            val total = running.size + succeeded
+            val active = running.isNotEmpty()
             
-            UploadProgress(total = total, finished = finished, isActive = active)
+            if (!active && total == 0) return@map UploadProgress()
+            UploadProgress(total = total, finished = succeeded, isActive = active)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UploadProgress())
 
     

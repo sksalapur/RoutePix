@@ -58,6 +58,8 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
@@ -126,6 +128,7 @@ fun TimelineScreen(
 
     var showTagSheet by remember { mutableStateOf(false) }
     var pendingUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var pendingFolderUri by remember { mutableStateOf<Uri?>(null) }
     var tagText by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf<String?>(null) }
     var selectedGroupKey by remember { mutableStateOf<String?>(null) }
@@ -135,10 +138,21 @@ fun TimelineScreen(
     val isAdmin = activeTrip?.adminUid == auth.currentUser?.uid
 
     val pickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
+        contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNotEmpty()) {
             pendingUris = uris
+            pendingFolderUri = null
+            showTagSheet = true
+        }
+    }
+
+    val folderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            pendingFolderUri = uri
+            pendingUris = emptyList()
             showTagSheet = true
         }
     }
@@ -195,15 +209,43 @@ fun TimelineScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    pickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Photos")
+            var expanded by remember { mutableStateOf(false) }
+
+            Box(contentAlignment = Alignment.BottomEnd) {
+                AnimatedVisibility(
+                    visible = expanded,
+                    modifier = Modifier.padding(bottom = 72.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        FloatingActionButton(
+                            onClick = {
+                                expanded = false
+                                folderLauncher.launch(null)
+                            },
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Icon(Icons.Default.Folder, contentDescription = "Select Folder")
+                        }
+                        FloatingActionButton(
+                            onClick = {
+                                expanded = false
+                                pickerLauncher.launch(arrayOf("image/*"))
+                            },
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Icon(Icons.Default.PhotoLibrary, contentDescription = "Select Photos")
+                        }
+                    }
+                }
+                
+                FloatingActionButton(
+                    onClick = { expanded = !expanded },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(if (expanded) Icons.Default.Close else Icons.Default.Add, contentDescription = "Add")
+                }
             }
         },
         bottomBar = {
@@ -307,13 +349,22 @@ fun TimelineScreen(
             availableTags = availableTags,
             onTagChange = { tagText = it },
             onConfirm = { finalTag ->
-                photoPickerViewModel.enqueuePhotos(
-                    tripId = tripId,
-                    uris = pendingUris,
-                    tag = finalTag
-                )
+                if (pendingFolderUri != null) {
+                    photoPickerViewModel.enqueueFolder(
+                        tripId = tripId,
+                        treeUri = pendingFolderUri!!,
+                        tag = finalTag
+                    )
+                } else if (pendingUris.isNotEmpty()) {
+                    photoPickerViewModel.enqueuePhotos(
+                        tripId = tripId,
+                        uris = pendingUris,
+                        tag = finalTag
+                    )
+                }
                 showTagSheet = false
                 pendingUris = emptyList()
+                pendingFolderUri = null
                 tagText = ""
                 selectedTag = null
             },
@@ -321,6 +372,7 @@ fun TimelineScreen(
             onDismiss = {
                 showTagSheet = false
                 pendingUris = emptyList()
+                pendingFolderUri = null
                 tagText = ""
                 selectedTag = null
             }

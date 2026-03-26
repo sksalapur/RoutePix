@@ -133,6 +133,7 @@ drawable ic_call_answer_video
 drawable ic_call_answer_video_low
 drawable ic_call_decline
 drawable ic_call_decline_low
+drawable ic_github
 drawable ic_launcher_master
 drawable ic_other_sign_in
 drawable ic_passkey

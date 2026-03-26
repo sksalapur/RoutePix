@@ -1,10 +1,14 @@
 [
     {
-        "merged": "com.routepix.app-debug-77:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "com.routepix.app-main-79:/mipmap-anydpi-v26/ic_launcher.xml"
+        "merged": "C:\\Users\\SKSAL\\.gradle\\daemon\\8.11.1\\com.routepix.app-debug-77:\\drawable_ic_launcher_master.png.flat",
+        "source": "C:\\Users\\SKSAL\\.gradle\\daemon\\8.11.1\\com.routepix.app-main-79:\\drawable\\ic_launcher_master.png"
     },
     {
-        "merged": "com.routepix.app-debug-77:/drawable_ic_launcher_master.png.flat",
-        "source": "com.routepix.app-main-79:/drawable/ic_launcher_master.png"
+        "merged": "C:\\Users\\SKSAL\\.gradle\\daemon\\8.11.1\\com.routepix.app-debug-77:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\SKSAL\\.gradle\\daemon\\8.11.1\\com.routepix.app-main-79:\\mipmap-anydpi-v26\\ic_launcher.xml"
+    },
+    {
+        "merged": "com.routepix.app-debug-77:/drawable_ic_github.xml.flat",
+        "source": "com.routepix.app-main-79:/drawable/ic_github.xml"
     }
 ]

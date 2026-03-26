@@ -14,6 +14,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import android.Manifest
+import android.os.Build
 import com.routepix.navigation.Routes
 import com.routepix.security.SecurityManager
 import com.routepix.ui.auth.AuthScreen
@@ -44,6 +49,23 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun RoutepixNavHost(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
+
+    val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO
+        )
+    } else {
+        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ -> }
+
+    LaunchedEffect(Unit) {
+        permissionLauncher.launch(permissions)
+    }
 
     NavHost(
         navController = navController,
