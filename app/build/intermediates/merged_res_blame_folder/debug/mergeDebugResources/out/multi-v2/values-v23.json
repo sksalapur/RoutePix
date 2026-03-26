@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.routepix.app-mergeDebugResources-75:/values-v23/values-v23.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\SKSAL\\.gradle\\caches\\8.11.1\\transforms\\eb28a80ce56f06560d115e070a9702f6\\transformed\\work-runtime-2.10.0\\res\\values-v23\\values-v23.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,121",
+                        "endColumns": "65,62",
+                        "endOffsets": "116,179"
+                    }
+                }
+            ]
+        }
+    ]
+}

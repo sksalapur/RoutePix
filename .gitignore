@@ -1,0 +1,34 @@
+# Android Studio / IntelliJ
+.gradle
+**/build/
+/.idea
+*.iml
+.kotlin
+.vscode
+
+# Firebase
+**/google-services.json
+
+# Local configuration
+local.properties
+
+# Build outputs & logs (Cleanup)
+build_log.txt
+build_log_*.txt
+build_output.txt
+build_output_*.txt
+final_build_log.txt
+build_final_log.txt
+build_error*.txt
+
+# Development artifacts
+CONVERSATION_LOG.md
+.agents/
+.agent/
+_agents/
+_agent/
+.gemini/
+
+# OS specific
+.DS_Store
+Thumbs.db

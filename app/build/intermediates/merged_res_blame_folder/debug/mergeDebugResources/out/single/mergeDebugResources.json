@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.routepix.app-debug-77:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.routepix.app-main-79:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.routepix.app-debug-77:/drawable_ic_launcher_master.png.flat",
+        "source": "com.routepix.app-main-79:/drawable/ic_launcher_master.png"
+    }
+]
