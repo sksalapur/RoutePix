@@ -186,6 +186,13 @@ fun TimelineScreen(
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
     val isAdmin = activeTrip?.adminUid == auth.currentUser?.uid
 
+    LaunchedEffect(grouped) {
+        val allPhotos = grouped.values.flatten()
+        if (allPhotos.isNotEmpty()) {
+            timelineViewModel.prefetchThumbnails(context, allPhotos)
+        }
+    }
+
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
@@ -396,7 +403,7 @@ fun TimelineScreen(
                                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    items(albumPhotos) { photo ->
+                                    items(albumPhotos, key = { it.photoId }) { photo ->
                                         val isSelected = photo.photoId in selectedPhotoIds
                                         Box(
                                             modifier = Modifier
@@ -437,7 +444,7 @@ fun TimelineScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    items(albumPhotos.size) { index ->
+                                    items(albumPhotos.size, key = { albumPhotos[it].photoId }) { index ->
                                         val photo = albumPhotos[index]
                                         PhotoRow(
                                             photo = photo,
@@ -469,7 +476,7 @@ fun TimelineScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 80.dp)
                         ) {
-                            items(grouped.keys.toList()) { groupKey ->
+                            items(grouped.keys.toList(), key = { it }) { groupKey ->
                                 val groupPhotos = grouped[groupKey] ?: emptyList()
                                 val isGroupSelected = groupPhotos.any { it.photoId in selectedPhotoIds }
                                 Column(

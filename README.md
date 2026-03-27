@@ -67,6 +67,7 @@ To create a trip, you need your own Telegram Bot. It takes 2 minutes:
 
 ## 📦 Release History (Since 1.1.0)
 
+- **v2.0.2** - **Premium Coil Image Engine.** Implemented custom Coil `ImageLoader` with aggressive Telegram CDN caching, 25% memory pool, and intelligent background prefetching. Lazy lists now use stable keys to eliminate jitter, providing a buttery-smooth scrolling experience.
 - **v2.0.1** - **UX & Stability Polish.** Added immediate visual feedback (loading overlay) after photo selection to eliminate the "nothing happens" gap. Updated download filename convention to `RoutePix_<timestamp>.jpg`. Fixed a critical `SecurityException` crash by adding the `DOWNLOAD_WITHOUT_NOTIFICATION` permission.
 - **v2.0.0** - **Dual-Format Upload Engine.** Every photo is now uploaded as both a compressed thumbnail (`sendPhoto`) and a full-quality document (`sendDocument`). Downloads always retrieve the original-quality version. Files under 50MB are preserved untouched — including Motion Photos. Removed misleading file size display from detailed view.
 - **v1.2.1** - Added automatic app update notifications via the GitHub Releases API. Users are notified when a new version is available with a direct download link.

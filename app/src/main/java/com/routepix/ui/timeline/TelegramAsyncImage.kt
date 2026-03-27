@@ -43,8 +43,19 @@ fun TelegramAsyncImage(
     if (resolvedUrl == null) {
         ShimmerBox(modifier = modifier)
     } else {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val imageRequest = remember(resolvedUrl, photo.telegramFileId) {
+            coil.request.ImageRequest.Builder(context)
+                .data(resolvedUrl)
+                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                .memoryCacheKey(photo.telegramFileId)
+                .diskCacheKey(photo.telegramFileId)
+                .build()
+        }
+
         SubcomposeAsyncImage(
-            model = resolvedUrl,
+            model = imageRequest,
             contentDescription = "Trip photo",
             contentScale = ContentScale.Crop,
             modifier = modifier.clip(RoundedCornerShape(8.dp)),

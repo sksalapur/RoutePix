@@ -206,6 +206,24 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             }
         }
 
+    fun prefetchThumbnails(context: android.content.Context, photos: List<PhotoMeta>) {
+        viewModelScope.launch {
+            val imageLoader = coil.Coil.imageLoader(context)
+            photos.take(10).forEach { photo ->
+                val url = resolveImageUrl(photo).firstOrNull()
+                if (url != null) {
+                    val request = coil.request.ImageRequest.Builder(context)
+                        .data(url)
+                        .size(coil.size.Size(256, 256))
+                        .memoryCacheKey(photo.telegramFileId)
+                        .diskCacheKey(photo.telegramFileId)
+                        .build()
+                    imageLoader.enqueue(request)
+                }
+            }
+        }
+    }
+
     fun downloadPhoto(context: android.content.Context, photo: PhotoMeta, albumName: String? = null) {
         viewModelScope.launch {
             val url = resolveDocumentUrl(photo).firstOrNull()
