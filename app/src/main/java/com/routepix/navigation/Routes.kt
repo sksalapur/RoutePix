@@ -11,5 +11,6 @@ sealed class Routes(val route: String) {
         fun createRoute(tripId: String) = "timeline/$tripId"
     }
     data object Permissions : Routes("permissions")
+    data object SavedPhotos : Routes("saved_photos")
 }
 

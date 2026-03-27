@@ -19,6 +19,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -132,6 +136,15 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     private val _viewMode = MutableStateFlow(ViewMode.GRID)
     val viewMode: StateFlow<ViewMode> = _viewMode.asStateFlow()
 
+    data class ShareProgress(
+        val inProgress: Boolean = false,
+        val current: Int = 0,
+        val total: Int = 0
+    )
+
+    private val _shareProgress = MutableStateFlow(ShareProgress())
+    val shareProgress: StateFlow<ShareProgress> = _shareProgress.asStateFlow()
+
     fun setViewMode(mode: ViewMode) {
         _viewMode.value = mode
     }
@@ -175,8 +188,8 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         .filterNotNull()
         .flatMapLatest { trip ->
             flow {
-                val fileId = photo.telegramDocumentId
-                if (fileId == null) {
+                val fileId = photo.telegramDocumentId ?: photo.telegramFileId
+                if (fileId.isEmpty()) {
                     emit(null)
                     return@flow
                 }
@@ -226,30 +239,130 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
 
     fun downloadPhoto(context: android.content.Context, photo: PhotoMeta, albumName: String? = null) {
         viewModelScope.launch {
+            val user = com.routepix.data.repository.UserRepository(
+                FirebaseFirestore.getInstance(), 
+                com.google.firebase.auth.FirebaseAuth.getInstance()
+            ).getCurrentUser()
+            val useGallery = user?.showDownloadedPhotosInGallery ?: false
+            
             val url = resolveDocumentUrl(photo).firstOrNull()
             if (url != null) {
-                com.routepix.util.DownloadUtils.enqueueDownload(
-                    context, 
-                    url, 
-                    "RoutePix_${photo.timestamp}.jpg",
-                    albumName
+                com.routepix.util.ImageDownloadManager.saveToAppStorage(
+                    context, url, "RoutePix_${photo.photoId}.jpg"
                 )
+                
+                if (useGallery) {
+                    com.routepix.util.DownloadUtils.enqueueDownload(
+                        context, 
+                        url, 
+                        "RoutePix_${photo.photoId}.jpg",
+                        albumName
+                    )
+                } else {
+                    launch(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Photo saved", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }
 
     fun downloadAlbum(context: android.content.Context, photos: List<PhotoMeta>, albumName: String) {
         viewModelScope.launch {
-            photos.forEach { photo ->
-                val url = resolveDocumentUrl(photo).firstOrNull()
-                if (url != null) {
-                    com.routepix.util.DownloadUtils.enqueueDownload(
-                        context, 
-                        url, 
-                        "RoutePix_${photo.timestamp}.jpg",
-                        albumName
-                    )
+            launch(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "Download in progress...", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            
+            val user = com.routepix.data.repository.UserRepository(
+                FirebaseFirestore.getInstance(), 
+                com.google.firebase.auth.FirebaseAuth.getInstance()
+            ).getCurrentUser()
+            val useGallery = user?.showDownloadedPhotosInGallery ?: false
+            
+            val deferredDownloads = photos.map { photo ->
+                async(Dispatchers.IO) {
+                    val url = resolveDocumentUrl(photo).firstOrNull()
+                    if (url != null) {
+                        val file = com.routepix.util.ImageDownloadManager.saveToAppStorage(
+                            context, url, "RoutePix_${photo.photoId}.jpg"
+                        )
+                        if (file != null) {
+                            if (useGallery) {
+                                com.routepix.util.DownloadUtils.enqueueDownload(
+                                    context, 
+                                    url, 
+                                    "RoutePix_${photo.photoId}.jpg",
+                                    albumName
+                                )
+                            }
+                            return@async true
+                        }
+                    }
+                    false
                 }
+            }
+            
+            val results = deferredDownloads.awaitAll()
+            val savedCount = results.count { it }
+
+            if (!useGallery && savedCount > 0) {
+                launch(Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "$savedCount photos saved", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    fun sharePhotos(context: android.content.Context, photos: List<PhotoMeta>) {
+        if (photos.isEmpty()) return
+        
+        viewModelScope.launch {
+            val photosToShare = photos.take(20)
+            _shareProgress.value = ShareProgress(inProgress = true, current = 0, total = photosToShare.size)
+            
+            val uris = java.util.concurrent.ConcurrentLinkedQueue<android.net.Uri>()
+            val currentProgress = java.util.concurrent.atomic.AtomicInteger(0)
+            
+            val deferredShares = photosToShare.map { photo ->
+                async(Dispatchers.IO) {
+                    val url = resolveDocumentUrl(photo).firstOrNull()
+                    if (url != null) {
+                        val file = com.routepix.util.ImageDownloadManager.downloadToCache(
+                            context, url, "Share_${photo.photoId}.jpg"
+                        )
+                        if (file != null) {
+                            uris.add(com.routepix.util.ImageDownloadManager.uriForFile(context, file))
+                        }
+                    }
+                    val count = currentProgress.incrementAndGet()
+                    _shareProgress.value = ShareProgress(inProgress = true, current = count, total = photosToShare.size)
+                }
+            }
+            deferredShares.awaitAll()
+            
+            _shareProgress.value = ShareProgress(inProgress = false)
+            
+            if (uris.isEmpty()) return@launch
+            
+            val intent = android.content.Intent().apply {
+                action = if (uris.size == 1) android.content.Intent.ACTION_SEND else android.content.Intent.ACTION_SEND_MULTIPLE
+                type = "image/jpeg"
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (uris.size == 1) {
+                    putExtra(android.content.Intent.EXTRA_STREAM, uris.first())
+                } else {
+                    putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, ArrayList(uris))
+                }
+            }
+            
+            launch(Dispatchers.Main) {
+                context.startActivity(android.content.Intent.createChooser(intent, "Share via..."))
+            }
+            
+            // Clean up cache roughly after 5 minutes
+            launch(Dispatchers.IO) {
+                delay(300_000)
+                com.routepix.util.ImageDownloadManager.cleanShareCache(context)
             }
         }
     }

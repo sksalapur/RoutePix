@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,6 +58,7 @@ fun TripHomeScreen(
     onJoinTrip: () -> Unit,
     onSettingsClick: () -> Unit,
     onTripClick: (Trip) -> Unit,
+    onViewSavedPhotos: () -> Unit,
     tripHomeViewModel: TripHomeViewModel = viewModel()
 ) {
     val uiState by tripHomeViewModel.uiState.collectAsState()
@@ -73,6 +75,22 @@ fun TripHomeScreen(
                 },
                 navigationIcon = {},
                 actions = {
+                    Surface(
+                        onClick = onViewSavedPhotos,
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier.height(36.dp).padding(end = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = "Saved Photos", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Saved", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    
                     val photoUrl = FirebaseAuth.getInstance().currentUser?.photoUrl
                     IconButton(onClick = onSettingsClick) {
                         if (photoUrl != null) {

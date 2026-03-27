@@ -37,6 +37,7 @@ import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import com.routepix.ui.home.SavedPhotosScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -137,7 +138,14 @@ fun RoutepixNavHost(modifier: Modifier = Modifier) {
                 onSettingsClick = { navController.navigate(Routes.Settings.route) },
                 onTripClick = { trip ->
                     navController.navigate(Routes.Timeline.createRoute(trip.tripId))
-                }
+                },
+                onViewSavedPhotos = { navController.navigate(Routes.SavedPhotos.route) }
+            )
+        }
+
+        composable(Routes.SavedPhotos.route) {
+            SavedPhotosScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

@@ -225,6 +225,51 @@ fun TimelineScreen(
 
     var showTagHelp by remember { mutableStateOf(false) }
 
+    val shareProgress by timelineViewModel.shareProgress.collectAsState()
+    
+    if (shareProgress.inProgress) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { /* Not cancellable */ }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val progress = if (shareProgress.total > 0) shareProgress.current.toFloat() / shareProgress.total else 0f
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.size(64.dp),
+                            strokeWidth = 6.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Text(
+                            "${(progress * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Preparing to share...",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Downloaded ${shareProgress.current} of ${shareProgress.total}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -256,7 +301,14 @@ fun TimelineScreen(
                     if (selectedPhotoIds.isNotEmpty()) {
                         IconButton(onClick = { 
                             val selectedPhotoMetas = photos.filter { it.photoId in selectedPhotoIds }
+                            timelineViewModel.sharePhotos(context, selectedPhotoMetas) 
+                        }) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Share, contentDescription = "Share Selected")
+                        }
+                        IconButton(onClick = { 
+                            val selectedPhotoMetas = photos.filter { it.photoId in selectedPhotoIds }
                             timelineViewModel.downloadAlbum(context, selectedPhotoMetas, "Selection") 
+                            timelineViewModel.clearSelection()
                         }) {
                             Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = "Download Selected")
                         }
@@ -270,6 +322,7 @@ fun TimelineScreen(
                         }
                     } else if (selectedGroupKey != null) {
                         val albumPhotos = grouped[selectedGroupKey] ?: emptyList()
+                        var menuExpanded by remember { mutableStateOf(false) }
                         IconButton(onClick = { 
                             timelineViewModel.setViewMode(
                                 if (viewMode == ViewMode.DETAILED) ViewMode.GRID else ViewMode.DETAILED
@@ -280,24 +333,49 @@ fun TimelineScreen(
                                 contentDescription = "Toggle View"
                             )
                         }
-                        IconButton(onClick = { 
-                            timelineViewModel.downloadAlbum(context, albumPhotos, selectedGroupKey!!) 
-                        }) {
-                            Icon(Icons.Default.Download, contentDescription = "Download Album")
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Options")
                         }
-                        if (isAdmin) {
-                            IconButton(onClick = {
-                                tagToEdit = if (selectedGroupKey == "Untagged") "" else selectedGroupKey!!
-                                albumPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
-                                showTagEditDialog = true
-                            }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Rename Tag")
-                            }
-                            IconButton(onClick = { 
-                                timelineViewModel.deleteAlbum(albumPhotos)
-                                selectedGroupKey = null
-                            }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete Album")
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Share") },
+                                onClick = {
+                                    menuExpanded = false
+                                    timelineViewModel.sharePhotos(context, albumPhotos)
+                                },
+                                leadingIcon = { Icon(Icons.Default.Share, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Download") },
+                                onClick = {
+                                    menuExpanded = false
+                                    timelineViewModel.downloadAlbum(context, albumPhotos, selectedGroupKey!!)
+                                },
+                                leadingIcon = { Icon(Icons.Default.Download, null) }
+                            )
+                            if (isAdmin) {
+                                DropdownMenuItem(
+                                    text = { Text("Rename") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        tagToEdit = if (selectedGroupKey == "Untagged") "" else selectedGroupKey!!
+                                        albumPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
+                                        showTagEditDialog = true
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Edit, null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        timelineViewModel.deleteAlbum(albumPhotos)
+                                        selectedGroupKey = null
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+                                )
                             }
                         }
                     } else {
@@ -1337,7 +1415,18 @@ private fun PhotoPagerOverlay(
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
             
-            Row {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { 
+                        timelineViewModel.sharePhotos(context, listOf(photoList[pagerState.currentPage])) 
+                    },
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
+                }
                 IconButton(
                     onClick = { 
                         timelineViewModel.downloadPhoto(context, photoList[pagerState.currentPage]) 

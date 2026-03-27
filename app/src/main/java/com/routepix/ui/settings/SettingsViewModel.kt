@@ -17,6 +17,7 @@ data class SettingsUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
+    val syncRequired: Boolean = false,
     val error: String? = null
 )
 
@@ -42,18 +43,22 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
-    fun saveSettings(displayName: String, botToken: String, chatId: String) {
+    fun saveSettings(displayName: String, botToken: String, chatId: String, showDownloadedPhotosInGallery: Boolean) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true, saveSuccess = false, error = null)
+            val prevState = _uiState.value.user?.showDownloadedPhotosInGallery ?: false
+            val syncReq = showDownloadedPhotosInGallery && !prevState
+            
+            _uiState.value = _uiState.value.copy(isSaving = true, saveSuccess = false, syncRequired = false, error = null)
             try {
                 userRepository.updateProfile(
                     displayName = displayName,
                     botToken = botToken,
-                    chatId = chatId
+                    chatId = chatId,
+                    showDownloadedPhotosInGallery = showDownloadedPhotosInGallery
                 )
 
                 tripRepository.syncCredentialsToTrips(botToken, chatId)
-                _uiState.value = _uiState.value.copy(saveSuccess = true)
+                _uiState.value = _uiState.value.copy(saveSuccess = true, syncRequired = syncReq)
                 loadUser()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.localizedMessage)
@@ -64,7 +69,7 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun resetSaveSuccess() {
-        _uiState.value = _uiState.value.copy(saveSuccess = false)
+        _uiState.value = _uiState.value.copy(saveSuccess = false, syncRequired = false)
     }
 
     fun signOut() {

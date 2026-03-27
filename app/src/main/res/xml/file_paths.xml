@@ -3,4 +3,10 @@
     <external-path
         name="pictures"
         path="Pictures/RoutePix/" />
+    <cache-path
+        name="shared_images"
+        path="share_cache/" />
+    <files-path
+        name="saved_images"
+        path="saved/" />
 </paths>

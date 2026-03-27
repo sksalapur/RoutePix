@@ -34,6 +34,7 @@ import android.content.Intent
 import android.net.Uri
 import com.routepix.R
 import com.routepix.data.model.User
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +47,7 @@ fun SettingsScreen(
     var displayName by remember(uiState.user) { mutableStateOf(uiState.user?.displayName ?: "") }
     var botToken by remember(uiState.user) { mutableStateOf(uiState.user?.telegramBotToken ?: "") }
     var chatId by remember(uiState.user) { mutableStateOf(uiState.user?.telegramChatId ?: "") }
+    var showInGallery by remember(uiState.user) { mutableStateOf(uiState.user?.showDownloadedPhotosInGallery ?: false) }
     
     var isEditing by remember { mutableStateOf(false) }
     var showTelegramGuide by remember { mutableStateOf(false) }
@@ -56,6 +58,11 @@ fun SettingsScreen(
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
             snackbarHostState.showSnackbar("Settings saved successfully")
+            if (uiState.syncRequired) {
+                scope.launch {
+                    com.routepix.util.ImageDownloadManager.syncSavedPhotosToGallery(context)
+                }
+            }
             isEditing = false
             viewModel.resetSaveSuccess()
         }
@@ -170,13 +177,40 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            SettingsCard(title = "App Preferences") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Show Saved Photos in Gallery", fontWeight = FontWeight.Bold)
+                        Text(
+                            "If disabled, downloaded photos will only be visible within RoutePix's internal Saved section.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = showInGallery,
+                        onCheckedChange = { showInGallery = it },
+                        enabled = isEditing
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             if (isEditing) {
                 Button(
-                    onClick = { viewModel.saveSettings(displayName, botToken, chatId) },
+                    onClick = { viewModel.saveSettings(displayName, botToken, chatId, showInGallery) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
                     enabled = !uiState.isSaving
