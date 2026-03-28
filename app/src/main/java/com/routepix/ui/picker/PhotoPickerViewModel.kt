@@ -48,8 +48,10 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
         val tripId: String,
         val uris: List<Uri>,
         val tag: String?,
-        val conflictingUris: List<Uri>,
-        val conflictingMetas: List<PhotoMeta>
+        val crossTagConflicts: List<Uri>,
+        val crossTagMetas: List<PhotoMeta>,
+        val sameTagConflicts: List<Uri>,
+        val sameTagMetas: List<PhotoMeta>
     )
 
     private val _pendingUpload = MutableStateFlow<UploadRequest?>(null)
@@ -129,9 +131,13 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to verify trip existence", e)
                 }
-                val (conflictUris, conflictMetas) = checkTagConflicts(tripId, uris, tag)
-                if (conflictMetas.isNotEmpty()) {
-                    _pendingUpload.value = UploadRequest(tripId, uris, tag, conflictUris, conflictMetas)
+                val checkResult = checkTagConflicts(tripId, uris, tag)
+                if (checkResult.crossTagConflicts.isNotEmpty() || checkResult.sameTagConflicts.isNotEmpty()) {
+                    _pendingUpload.value = UploadRequest(
+                        tripId, uris, tag, 
+                        checkResult.crossTagConflicts, checkResult.crossTagMetas,
+                        checkResult.sameTagConflicts, checkResult.sameTagMetas
+                    )
                 } else {
                     enqueuePhotos(tripId, uris, tag)
                 }
@@ -141,28 +147,70 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun requestUpload(tripId: String, uris: List<Uri>, tag: String?) {
         appScope.launch {
-            val (conflictUris, conflictMetas) = checkTagConflicts(tripId, uris, tag)
-            if (conflictMetas.isNotEmpty()) {
-                _pendingUpload.value = UploadRequest(tripId, uris, tag, conflictUris, conflictMetas)
+            val checkResult = checkTagConflicts(tripId, uris, tag)
+            if (checkResult.crossTagConflicts.isNotEmpty() || checkResult.sameTagConflicts.isNotEmpty()) {
+                _pendingUpload.value = UploadRequest(
+                    tripId, uris, tag, 
+                    checkResult.crossTagConflicts, checkResult.crossTagMetas,
+                    checkResult.sameTagConflicts, checkResult.sameTagMetas
+                )
             } else {
                 enqueuePhotos(tripId, uris, tag)
             }
         }
     }
 
-    fun resolvePendingUpload(forceAdd: Boolean) {
+    enum class DuplicateAction {
+        SKIP_ALL,
+        ADD_CROSS_TAG_ONLY,
+        ADD_ALL
+    }
+
+    fun resolvePendingUpload(action: DuplicateAction) {
         val request = _pendingUpload.value ?: return
         _pendingUpload.value = null
-        if (forceAdd) {
-            forceAddPhotos(request.tripId, request.conflictingMetas, request.tag)
+        
+        val metasToForceAdd = mutableListOf<PhotoMeta>()
+        val urisToSkip = mutableSetOf<Uri>()
+        
+        when (action) {
+            DuplicateAction.SKIP_ALL -> {
+                urisToSkip.addAll(request.crossTagConflicts)
+                urisToSkip.addAll(request.sameTagConflicts)
+            }
+            DuplicateAction.ADD_CROSS_TAG_ONLY -> {
+                metasToForceAdd.addAll(request.crossTagMetas)
+                urisToSkip.addAll(request.sameTagConflicts)
+                // Cross tag conflicts are now force-added, so we drop them from the normal enqueue queue
+                urisToSkip.addAll(request.crossTagConflicts)
+            }
+            DuplicateAction.ADD_ALL -> {
+                metasToForceAdd.addAll(request.crossTagMetas)
+                metasToForceAdd.addAll(request.sameTagMetas)
+                // All conflicts are force added, drop from normal enqueue queue
+                urisToSkip.addAll(request.crossTagConflicts)
+                urisToSkip.addAll(request.sameTagConflicts)
+            }
         }
-        val remainingUris = request.uris - request.conflictingUris.toSet()
+        
+        if (metasToForceAdd.isNotEmpty()) {
+            forceAddPhotos(request.tripId, metasToForceAdd, request.tag)
+        }
+        
+        val remainingUris = request.uris - urisToSkip
         if (remainingUris.isNotEmpty()) {
             enqueuePhotos(request.tripId, remainingUris, request.tag)
         }
     }
 
-    suspend fun checkTagConflicts(tripId: String, uris: List<Uri>, newTag: String?): Pair<List<Uri>, List<PhotoMeta>> = withContext(Dispatchers.IO) {
+    data class ConflictResult(
+        val crossTagConflicts: List<Uri>,
+        val crossTagMetas: List<PhotoMeta>,
+        val sameTagConflicts: List<Uri>,
+        val sameTagMetas: List<PhotoMeta>
+    )
+
+    suspend fun checkTagConflicts(tripId: String, uris: List<Uri>, newTag: String?): ConflictResult = withContext(Dispatchers.IO) {
         val context = getApplication<Application>()
         val existingHashes = mutableMapOf<String, PhotoMeta>()
         try {
@@ -178,8 +226,10 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             }
         } catch (_: Exception) {}
 
-        val conflictingUris = mutableListOf<Uri>()
-        val conflictingMetas = mutableListOf<PhotoMeta>()
+        val crossUris = mutableListOf<Uri>()
+        val crossMetas = mutableListOf<PhotoMeta>()
+        val sameUris = mutableListOf<Uri>()
+        val sameMetas = mutableListOf<PhotoMeta>()
 
         for (uri in uris) {
             try {
@@ -188,12 +238,17 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             
             val md5 = PhotoUtils.computeMd5(context, uri)
             val existing = existingHashes[md5]
-            if (existing != null && existing.tag != newTag) {
-                conflictingUris.add(uri)
-                conflictingMetas.add(existing)
+            if (existing != null) {
+                if (existing.tag != newTag) {
+                    crossUris.add(uri)
+                    crossMetas.add(existing)
+                } else {
+                    sameUris.add(uri)
+                    sameMetas.add(existing)
+                }
             }
         }
-        Pair(conflictingUris, conflictingMetas)
+        ConflictResult(crossUris, crossMetas, sameUris, sameMetas)
     }
 
     fun forceAddPhotos(tripId: String, photos: List<PhotoMeta>, newTag: String?) {
@@ -207,6 +262,7 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             val newPhoto = PhotoMeta(
                 photoId = newId,
                 telegramFileId = photo.telegramFileId,
+                telegramDocumentId = photo.telegramDocumentId,
                 uploaderUid = uid,
                 timestamp = System.currentTimeMillis(),
                 placeName = photo.placeName,
@@ -214,7 +270,8 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
                 lng = photo.lng,
                 tag = newTag,
                 md5Hash = photo.md5Hash,
-                sizeBytes = photo.sizeBytes
+                sizeBytes = photo.sizeBytes,
+                isMotionPhoto = photo.isMotionPhoto
             )
             val ref = db.collection("trips").document(tripId).collection("photos").document(newId)
             batch.set(ref, newPhoto)
@@ -322,6 +379,8 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             val exif = PhotoUtils.extractExif(context, uri)
+            val isMotion = PhotoUtils.isMotionPhoto(context, uri)
+            Log.d(TAG, "Enqueue: uri=$uri isMotion=$isMotion")
 
             val queuedPhoto = QueuedPhoto(
                 localUri = uri.toString(),
@@ -330,7 +389,8 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
                 lat = exif.lat,
                 lng = exif.lng,
                 tag = tag,
-                md5Hash = md5
+                md5Hash = md5,
+                isMotionPhoto = isMotion
             )
             val insertedId = dao.insert(queuedPhoto).toInt()
             EnqueueResult.Queued(insertedId)

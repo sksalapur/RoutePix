@@ -65,11 +65,16 @@ object ImageDownloadManager {
 
     /**
      * Downloads an image to the private saved directory.
+     * If subfolder is provided, saves to saved/{subfolder}/filename.
      * Returns the File if successful, null otherwise.
      */
-    suspend fun saveToAppStorage(context: Context, url: String, filename: String): File? = withContext(Dispatchers.IO) {
+    suspend fun saveToAppStorage(context: Context, url: String, filename: String, subfolder: String? = null): File? = withContext(Dispatchers.IO) {
         try {
-            val savedDir = File(context.filesDir, "saved")
+            val savedDir = if (subfolder != null) {
+                File(File(context.filesDir, "saved"), subfolder)
+            } else {
+                File(context.filesDir, "saved")
+            }
             if (!savedDir.exists()) savedDir.mkdirs()
 
             val file = File(savedDir, filename)

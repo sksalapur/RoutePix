@@ -193,7 +193,28 @@ fun RoutepixNavHost(modifier: Modifier = Modifier) {
             val tripId = backStackEntry.arguments?.getString("tripId") ?: ""
             TimelineScreen(
                 tripId = tripId,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToOriginal = { photoId ->
+                    navController.navigate(Routes.OriginalViewer.createRoute(tripId, photoId))
+                }
+            )
+        }
+        
+        composable(
+            route = Routes.OriginalViewer.route,
+            arguments = listOf(
+                navArgument("tripId") { type = NavType.StringType },
+                navArgument("photoId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString("tripId") ?: ""
+            val photoId = backStackEntry.arguments?.getString("photoId") ?: ""
+            
+            com.routepix.ui.timeline.OriginalViewerScreen(
+                tripId = tripId,
+                photoId = photoId,
+                onNavigateBack = { navController.popBackStack() },
+                timelineViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
             )
         }
     }

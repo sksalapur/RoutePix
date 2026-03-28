@@ -43,6 +43,40 @@ object PhotoUtils {
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
+
+    fun isMotionPhoto(context: Context, uri: Uri): Boolean {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val bytes = stream.readBytes()
+                
+                // Method 1: Check XMP metadata for known motion photo markers
+                // Search in first 256KB for XMP markers (covers all known devices)
+                val headerSize = minOf(bytes.size, 262144)
+                val header = String(bytes, 0, headerSize, Charsets.ISO_8859_1)
+                if (header.contains("MotionPhoto=\"1\"") || 
+                    header.contains("MotionPhoto=1") ||
+                    header.contains("MotionPhoto_PresentationTimestampUs") ||
+                    header.contains("mpvd")) {
+                    return@use true
+                }
+                
+                // Method 2: Scan for embedded MP4 'ftyp' box (definitive proof)
+                for (i in 4 until bytes.size - 4) {
+                    if (bytes[i] == 0x66.toByte() &&
+                        bytes[i + 1] == 0x74.toByte() &&
+                        bytes[i + 2] == 0x79.toByte() &&
+                        bytes[i + 3] == 0x70.toByte()
+                    ) {
+                        return@use true
+                    }
+                }
+                
+                false
+            } ?: false
+        } catch (_: Exception) {
+            false
+        }
+    }
  
     
     fun uriToRequestBody(context: Context, uri: Uri, contentType: String? = "image/jpeg"): RequestBody {
@@ -235,6 +269,85 @@ object PhotoUtils {
             } ?: sourceBitmap
         } catch (_: Exception) {
             sourceBitmap
+        }
+    }
+
+    /**
+     * Download a file from [url] to a temp file, then extract the embedded MP4 track.
+     * Motion photos are JPEG+MP4 concatenated. We scan for the 'ftyp' box which marks
+     * the start of the MP4 container.
+     * Returns the path to the extracted .mp4 temp file, or null on failure.
+     */
+    fun extractMotionPhotoVideo(context: Context, url: String): java.io.File? {
+        return try {
+            val rawFile = java.io.File(context.cacheDir, "motion_raw_${System.currentTimeMillis()}.dat")
+            java.net.URL(url).openStream().use { input ->
+                java.io.FileOutputStream(rawFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            val mp4File = extractMotionPhotoVideo(context, rawFile)
+            rawFile.delete() // cleanup the downloaded raw file
+            mp4File
+        } catch (e: Exception) {
+            android.util.Log.e("PhotoUtils", "extractMotionPhotoVideo (url) failed", e)
+            null
+        }
+    }
+
+    /**
+     * Extracts the embedded MP4 track from a local [file].
+     * Returns the path to the extracted .mp4 temp file, or null if no MP4 track is found.
+     */
+    fun extractMotionPhotoVideo(context: Context, file: java.io.File): java.io.File? {
+        return try {
+            // Find 'ftyp' box → bytes 66 74 79 70
+            val bytes = file.readBytes()
+            var ftypOffset = -1
+            for (i in 4 until bytes.size - 4) {
+                if (bytes[i] == 0x66.toByte() &&
+                    bytes[i + 1] == 0x74.toByte() &&
+                    bytes[i + 2] == 0x79.toByte() &&
+                    bytes[i + 3] == 0x70.toByte()
+                ) {
+                    // The box header starts 4 bytes before 'ftyp' (box-size field)
+                    ftypOffset = i - 4
+                    break
+                }
+            }
+
+            if (ftypOffset < 0) {
+                return null
+            }
+
+            // Extract MP4 from ftypOffset to end
+            val mp4File = java.io.File(context.cacheDir, "motion_${System.currentTimeMillis()}.mp4")
+            java.io.FileOutputStream(mp4File).use { out ->
+                out.write(bytes, ftypOffset, bytes.size - ftypOffset)
+            }
+            mp4File
+        } catch (e: Exception) {
+            android.util.Log.e("PhotoUtils", "extractMotionPhotoVideo (file) failed", e)
+            null
+        }
+    }
+
+    /**
+     * Download a file from [url] to a local cache file.
+     * Returns the downloaded file, or null on failure.
+     */
+    fun downloadToCache(context: Context, url: String, extension: String = "jpg"): java.io.File? {
+        return try {
+            val file = java.io.File(context.cacheDir, "original_${System.currentTimeMillis()}.$extension")
+            java.net.URL(url).openStream().use { input ->
+                java.io.FileOutputStream(file).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            file
+        } catch (e: Exception) {
+            android.util.Log.e("PhotoUtils", "downloadToCache failed", e)
+            null
         }
     }
 }

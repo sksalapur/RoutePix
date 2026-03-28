@@ -34,6 +34,8 @@ fun TelegramAsyncImage(
     photo: PhotoMeta,
     botToken: String, // Kept for backwards compatibility if needed, but using VM now
     modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    contentDescription: String? = "Trip photo",
     timelineViewModel: TimelineViewModel = viewModel()
 ) {
     val resolvedUrl by remember(photo.telegramFileId) {
@@ -56,9 +58,9 @@ fun TelegramAsyncImage(
 
         SubcomposeAsyncImage(
             model = imageRequest,
-            contentDescription = "Trip photo",
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(RoundedCornerShape(8.dp)),
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier,
             loading = {
                 ShimmerBox(modifier = Modifier.matchParentSize())
             },

@@ -83,6 +83,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
@@ -106,6 +107,7 @@ import java.util.Locale
 fun TimelineScreen(
     tripId: String,
     onBack: () -> Unit,
+    onNavigateToOriginal: (String) -> Unit,
     timelineViewModel: TimelineViewModel = viewModel(),
     photoPickerViewModel: PhotoPickerViewModel = viewModel()
 ) {
@@ -121,56 +123,139 @@ fun TimelineScreen(
     val pendingUpload by photoPickerViewModel.pendingUpload.collectAsState()
     val pickerQueueState by photoPickerViewModel.queueState.collectAsState()
     
-    var selectedGroupKey by remember { mutableStateOf<String?>(null) }
-    var showTagEditDialog by remember { mutableStateOf(false) }
-    var tagToEdit by remember { mutableStateOf("") }
+    var selectedGroupKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var showTagEditSheet by rememberSaveable { mutableStateOf(false) }
+    var tagToEdit by rememberSaveable { mutableStateOf("") }
 
-    if (showTagEditDialog) {
-        AlertDialog(
-            onDismissRequest = { showTagEditDialog = false },
-            title = { Text("Edit Tag") },
-            text = {
+    if (showTagEditSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showTagEditSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Move to Tag",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Select an existing tag or enter a new one",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                )
+
                 OutlinedTextField(
                     value = tagToEdit,
                     onValueChange = { tagToEdit = it },
-                    label = { Text("New Tag (e.g. Day 1, Scenery)") },
+                    placeholder = { Text("New tag name...") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        if (tagToEdit.isNotBlank()) {
+                            IconButton(onClick = {
+                                timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), tagToEdit)
+                                showTagEditSheet = false
+                                timelineViewModel.clearSelection()
+                                selectedGroupKey = null
+                                tagToEdit = ""
+                            }) {
+                                Icon(Icons.Default.Check, contentDescription = "Add Tag", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val finalTag = if (tagToEdit.isBlank()) null else tagToEdit
-                    timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), finalTag)
-                    showTagEditDialog = false
-                    tagToEdit = ""
-                    timelineViewModel.clearSelection()
-                    selectedGroupKey = null
-                }) {
-                    Text("Update")
+
+                if (availableTags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Or choose existing:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(availableTags) { tag ->
+                            Surface(
+                                onClick = {
+                                    timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), tag)
+                                    showTagEditSheet = false
+                                    timelineViewModel.clearSelection()
+                                    selectedGroupKey = null
+                                    tagToEdit = ""
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = tag,
+                                    modifier = Modifier.padding(16.dp),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTagEditDialog = false }) {
-                    Text("Cancel")
-                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
-        )
+        }
     }
 
     if (pendingUpload != null) {
+        val cross = pendingUpload!!.crossTagConflicts.size
+        val same = pendingUpload!!.sameTagConflicts.size
+        
+        val message = buildString {
+            if (same > 0) append("$same photos already exist in this tag. ")
+            if (cross > 0) append("\n$cross photos exist in other tags. Add them to '${pendingUpload!!.tag ?: "Untagged"}' too?")
+        }.trim()
+
         AlertDialog(
-            onDismissRequest = { photoPickerViewModel.resolvePendingUpload(false) },
-            title = { Text("Already Uploaded") },
-            text = { Text("${pendingUpload!!.conflictingUris.size} of the selected photos are already uploaded under a different tag. Would you like to add them to '${pendingUpload!!.tag ?: "Untagged"}' as well?") },
+            onDismissRequest = { photoPickerViewModel.resolvePendingUpload(com.routepix.ui.picker.PhotoPickerViewModel.DuplicateAction.SKIP_ALL) },
+            title = { Text("Duplicates Found") },
+            text = { Text(message) },
             confirmButton = {
-                TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(true) }) {
-                    Text("Add Anyway")
+                androidx.compose.foundation.layout.Row(
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                ) {
+                    if (same > 0 && cross > 0) {
+                        TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(com.routepix.ui.picker.PhotoPickerViewModel.DuplicateAction.ADD_ALL) }) {
+                            Text("Add All")
+                        }
+                        TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(com.routepix.ui.picker.PhotoPickerViewModel.DuplicateAction.ADD_CROSS_TAG_ONLY) }) {
+                            Text("Skip Same Tag")
+                        }
+                    } else if (cross > 0) {
+                        TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(com.routepix.ui.picker.PhotoPickerViewModel.DuplicateAction.ADD_CROSS_TAG_ONLY) }) {
+                            Text("Add Anyway")
+                        }
+                    } else if (same > 0) {
+                        TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(com.routepix.ui.picker.PhotoPickerViewModel.DuplicateAction.ADD_ALL) }) {
+                            Text("Add Anyway")
+                        }
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(false) }) {
-                    Text("Skip Duplicates")
+                TextButton(onClick = { photoPickerViewModel.resolvePendingUpload(com.routepix.ui.picker.PhotoPickerViewModel.DuplicateAction.SKIP_ALL) }) {
+                    Text("Skip All Duplicates")
                 }
             }
         )
@@ -181,7 +266,7 @@ fun TimelineScreen(
     var pendingFolderUri by remember { mutableStateOf<Uri?>(null) }
     var tagText by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf<String?>(null) }
-    var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
+    var selectedPhotoIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
     val isAdmin = activeTrip?.adminUid == auth.currentUser?.uid
@@ -224,6 +309,7 @@ fun TimelineScreen(
     }
 
     var showTagHelp by remember { mutableStateOf(false) }
+    var showQualityInfo by remember { mutableStateOf(false) }
 
     val shareProgress by timelineViewModel.shareProgress.collectAsState()
     
@@ -313,7 +399,7 @@ fun TimelineScreen(
                             Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = "Download Selected")
                         }
                         if (isAdmin) {
-                            IconButton(onClick = { showTagEditDialog = true }) {
+                            IconButton(onClick = { showTagEditSheet = true }) {
                                 Icon(androidx.compose.material.icons.Icons.Default.Edit, contentDescription = "Edit Tag")
                             }
                             IconButton(onClick = { timelineViewModel.deletePhotos(selectedPhotoIds.toList()) }) {
@@ -358,12 +444,12 @@ fun TimelineScreen(
                             )
                             if (isAdmin) {
                                 DropdownMenuItem(
-                                    text = { Text("Rename") },
+                                    text = { Text("Rename Album") },
                                     onClick = {
                                         menuExpanded = false
-                                        tagToEdit = if (selectedGroupKey == "Untagged") "" else selectedGroupKey!!
-                                        albumPhotos.forEach { timelineViewModel.toggleSelection(it.photoId) }
-                                        showTagEditDialog = true
+                                        tagToEdit = if (selectedGroupKey == "Untagged") "" else selectedGroupKey ?: ""
+                                        timelineViewModel.selectAll(albumPhotos.map { it.photoId })
+                                        showTagEditSheet = true
                                     },
                                     leadingIcon = { Icon(Icons.Default.Edit, null) }
                                 )
@@ -379,6 +465,9 @@ fun TimelineScreen(
                             }
                         }
                     } else {
+                        IconButton(onClick = { showQualityInfo = true }) {
+                            Icon(Icons.Default.Info, contentDescription = "About image quality", tint = MaterialTheme.colorScheme.primary)
+                        }
                         SortModeSelector(
                             currentMode = sortMode,
                             onModeSelected = {
@@ -498,7 +587,7 @@ fun TimelineScreen(
                                                     }
                                                 )
                                         ) {
-                                            TelegramAsyncImage(
+                                            TimelineMediaItem(
                                                 photo = photo,
                                                 timelineViewModel = timelineViewModel,
                                                 contentDescription = null,
@@ -668,7 +757,8 @@ fun TimelineScreen(
                 photoList = albumPhotos,
                 timelineViewModel = timelineViewModel,
                 isAdmin = isAdmin,
-                onClose = { selectedPhotoIndex = null }
+                onClose = { selectedPhotoIndex = null },
+                onNavigateToOriginal = { photoId -> onNavigateToOriginal(photoId) }
             )
         }
     }
@@ -720,6 +810,66 @@ fun TimelineScreen(
                 Text("Tags help you organize your photos. You can use them for:\n\n• Location (e.g., Paris, Beach)\n• Place Name (e.g., Eiffel Tower)\n• Activity (e.g., Dinner, Hiking)\n• People (e.g., Friends, Family)\n\nPhotos with the same tag are grouped into beautiful albums automatically!")
             },
             icon = { Icon(Icons.Default.PhotoLibrary, null) }
+        )
+    }
+
+    if (showQualityInfo) {
+        AlertDialog(
+            onDismissRequest = { showQualityInfo = false },
+            confirmButton = {
+                TextButton(onClick = { showQualityInfo = false }) { Text("Got it") }
+            },
+            title = { Text("About image quality") },
+            text = { 
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Photos in timeline are optimized for speed. Shared/downloaded photos are full quality.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Icon Guide", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.HighQuality,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                .padding(3.dp)
+                        )
+                        Text(
+                            "Original quality available. Tap to view the high-resolution image.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayCircle,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                .padding(3.dp)
+                        )
+                        Text(
+                            "Motion photo. Tap to watch the embedded video with audio.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            icon = { Icon(Icons.Default.Info, null) }
         )
     }
 }
@@ -1004,7 +1154,7 @@ private fun PhotoRow(
                     modifier = Modifier.padding(end = 8.dp)
                 )
             }
-            TelegramAsyncImage(
+            TimelineMediaItem(
                 photo = photo,
                 timelineViewModel = timelineViewModel,
                 contentDescription = null,
@@ -1066,7 +1216,7 @@ private fun AlbumCollageThumbnail(
                 )
             }
             displayPhotos.size == 1 -> {
-                TelegramAsyncImage(
+                TimelineMediaItem(
                     photo = displayPhotos[0],
                     timelineViewModel = timelineViewModel,
                     contentDescription = null,
@@ -1077,7 +1227,7 @@ private fun AlbumCollageThumbnail(
             else -> {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.weight(1f)) {
-                        TelegramAsyncImage(
+                        TimelineMediaItem(
                             photo = displayPhotos[0],
                             timelineViewModel = timelineViewModel,
                             contentDescription = null,
@@ -1086,7 +1236,7 @@ private fun AlbumCollageThumbnail(
                         )
                         if (displayPhotos.size >= 2) {
                             Spacer(modifier = Modifier.width(1.dp))
-                            TelegramAsyncImage(
+                            TimelineMediaItem(
                                 photo = displayPhotos[1],
                                 timelineViewModel = timelineViewModel,
                                 contentDescription = null,
@@ -1098,7 +1248,7 @@ private fun AlbumCollageThumbnail(
                     if (displayPhotos.size >= 3) {
                         Spacer(modifier = Modifier.height(1.dp))
                         Row(modifier = Modifier.weight(1f)) {
-                            TelegramAsyncImage(
+                            TimelineMediaItem(
                                 photo = displayPhotos[2],
                                 timelineViewModel = timelineViewModel,
                                 contentDescription = null,
@@ -1107,7 +1257,7 @@ private fun AlbumCollageThumbnail(
                             )
                             if (displayPhotos.size >= 4) {
                                 Spacer(modifier = Modifier.width(1.dp))
-                                TelegramAsyncImage(
+                                TimelineMediaItem(
                                     photo = displayPhotos[3],
                                     timelineViewModel = timelineViewModel,
                                     contentDescription = null,
@@ -1126,7 +1276,7 @@ private fun AlbumCollageThumbnail(
 }
 
 @Composable
-fun TelegramAsyncImage(
+private fun TimelineMediaItem(
     photo: PhotoMeta,
     timelineViewModel: TimelineViewModel,
     contentDescription: String?,
@@ -1134,15 +1284,44 @@ fun TelegramAsyncImage(
     contentScale: ContentScale = ContentScale.Fit
 ) {
     val url by timelineViewModel.resolveImageUrl(photo).collectAsState(initial = null)
-    
-    AsyncImage(
-        model = url,
-        contentDescription = contentDescription,
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-        contentScale = contentScale,
-        placeholder = null,
-        error = null
-    )
+    Box(modifier = modifier) {
+        AsyncImage(
+            model = url,
+            contentDescription = contentDescription,
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+            contentScale = contentScale,
+            placeholder = null,
+            error = null
+        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (photo.isMotionPhoto) {
+                Icon(
+                    imageVector = Icons.Default.PlayCircle,
+                    contentDescription = "Motion Photo",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        .padding(2.dp)
+                )
+            } else if (photo.telegramDocumentId != null) {
+                Icon(
+                    imageVector = Icons.Default.HighQuality,
+                    contentDescription = "HD Content",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        .padding(2.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1273,7 +1452,8 @@ private fun PhotoPagerOverlay(
     photoList: List<PhotoMeta>,
     timelineViewModel: TimelineViewModel,
     isAdmin: Boolean,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onNavigateToOriginal: (String) -> Unit
 ) {
     val selectedPhotoIds by timelineViewModel.selectedPhotoIds.collectAsState()
     val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { photoList.size })
@@ -1385,8 +1565,7 @@ private fun PhotoPagerOverlay(
             ) {
                 TelegramAsyncImage(
                     photo = photoList[page],
-                    timelineViewModel = timelineViewModel,
-                    contentDescription = null,
+                    botToken = "",
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
@@ -1395,6 +1574,7 @@ private fun PhotoPagerOverlay(
                             translationX = offset.x
                             translationY = offset.y + dragOffset
                         },
+                    timelineViewModel = timelineViewModel,
                     contentScale = ContentScale.Fit
                 )
             }
@@ -1419,6 +1599,22 @@ private fun PhotoPagerOverlay(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // View Original / Motion button
+                val currentPhoto = photoList[pagerState.currentPage]
+                if (currentPhoto.isMotionPhoto || currentPhoto.telegramDocumentId != null) {
+                    IconButton(
+                        onClick = {
+                            onNavigateToOriginal(currentPhoto.photoId)
+                        },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    ) {
+                        if (currentPhoto.isMotionPhoto) {
+                            Icon(Icons.Default.PlayCircle, contentDescription = "View Motion Photo", tint = Color.White)
+                        } else {
+                            Icon(Icons.Default.HighQuality, contentDescription = "View Original Quality", tint = Color.White)
+                        }
+                    }
+                }
                 IconButton(
                     onClick = { 
                         timelineViewModel.sharePhotos(context, listOf(photoList[pagerState.currentPage])) 
@@ -1483,10 +1679,9 @@ private fun PhotoPagerOverlay(
                     ) {
                         TelegramAsyncImage(
                             photo = photo,
-                            timelineViewModel = timelineViewModel,
-                            contentDescription = null,
+                            botToken = "",
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                            timelineViewModel = timelineViewModel
                         )
                     }
                 }

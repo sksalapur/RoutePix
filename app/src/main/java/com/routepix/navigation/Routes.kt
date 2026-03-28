@@ -12,5 +12,8 @@ sealed class Routes(val route: String) {
     }
     data object Permissions : Routes("permissions")
     data object SavedPhotos : Routes("saved_photos")
+    data object OriginalViewer : Routes("original_viewer/{tripId}/{photoId}") {
+        fun createRoute(tripId: String, photoId: String) = "original_viewer/$tripId/$photoId"
+    }
 }
 

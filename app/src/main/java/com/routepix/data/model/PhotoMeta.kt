@@ -1,5 +1,6 @@
 package com.routepix.data.model
 
+import com.google.firebase.firestore.PropertyName
 
 data class PhotoMeta(
     val photoId: String = "",
@@ -13,6 +14,8 @@ data class PhotoMeta(
     val placeName: String? = null,
     val tag: String? = null,
     val md5Hash: String? = null,
-    val sizeBytes: Long? = null
+    val sizeBytes: Long? = null,
+    @get:PropertyName("isMotionPhoto")
+    @set:PropertyName("isMotionPhoto")
+    var isMotionPhoto: Boolean = false
 )
-

@@ -33,6 +33,11 @@ service cloud.firestore {
           request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberUids ||
           request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.adminUid
         );
+        allow update: if isAuth() && (
+          request.auth.uid == resource.data.uploaderUid ||
+          request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.adminUid ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isMotionPhoto'])
+        );
         allow delete: if isAuth() && (
           request.auth.uid == resource.data.uploaderUid || 
           request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.adminUid

@@ -1,0 +1,34 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Camera aperture icon centered in adaptive icon safe zone -->
+    <group
+        android:translateX="27"
+        android:translateY="27">
+        <!-- Outer circle -->
+        <path
+            android:pathData="M27,3C13.74,3 3,13.74 3,27s10.74,24 24,24 24,-10.74 24,-24S40.26,3 27,3zM27,47c-11.05,0 -20,-8.95 -20,-20s8.95,-20 20,-20 20,8.95 20,20 -8.95,20 -20,20z"
+            android:fillColor="#FFFFFF"/>
+        <!-- Aperture blades -->
+        <path
+            android:pathData="M16.14,21.89L10.98,30.38c1.57,4.12 4.61,7.44 8.48,9.44l5.15,-8.92z"
+            android:fillColor="#FFFFFF"/>
+        <path
+            android:pathData="M27,12.88c-2.95,0 -5.69,0.92 -7.95,2.48l5.17,8.95h10.29c-0.10,-6.38 -3.53,-11.44 -7.51,-11.43z"
+            android:fillColor="#FFFFFF"/>
+        <path
+            android:pathData="M35.66,16.50l-5.15,8.93 5.15,8.92c3.64,-2.87 5.99,-7.29 5.99,-12.24 0,-2.00 -0.39,-3.90 -1.08,-5.64z"
+            android:fillColor="#FFFFFF"/>
+        <path
+            android:pathData="M37.86,32.11l-10.29,0 -5.15,8.93c2.26,1.56 5.00,2.48 7.95,2.48 4.17,0 7.87,-1.96 10.27,-5.01z"
+            android:fillColor="#FFFFFF"/>
+        <path
+            android:pathData="M18.34,37.50l5.15,-8.93 -5.15,-8.92c-3.64,2.87 -5.99,7.29 -5.99,12.24 0,2.00 0.39,3.90 1.08,5.64z"
+            android:fillColor="#FFFFFF"/>
+        <path
+            android:pathData="M27,41.12c2.95,0 5.69,-0.92 7.95,-2.48L29.78,29.69H19.49c0.10,6.38 3.53,11.44 7.51,11.43z"
+            android:fillColor="#FFFFFF"/>
+    </group>
+</vector>

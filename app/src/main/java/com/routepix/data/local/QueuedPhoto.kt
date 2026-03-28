@@ -19,6 +19,6 @@ data class QueuedPhoto(
     val lat: Double? = null,
     val lng: Double? = null,
     val tag: String? = null,
-    val md5Hash: String
+    val md5Hash: String,
+    val isMotionPhoto: Boolean = false
 )
-

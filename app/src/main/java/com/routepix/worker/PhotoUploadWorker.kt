@@ -294,6 +294,9 @@ class PhotoUploadWorker(
         }
 
         // ── Step 3: Save metadata to Firestore ──────────
+        val isMotion = photo.isMotionPhoto
+        Log.d(TAG, "Saving photo with isMotionPhoto=$isMotion, docId=$documentFileId")
+        
         val photoMeta = PhotoMeta(
             photoId = UUID.randomUUID().toString(),
             tripId = tripId,
@@ -303,7 +306,8 @@ class PhotoUploadWorker(
             timestamp = photo.timestamp,
             tag = photo.tag,
             md5Hash = photo.md5Hash,
-            sizeBytes = photoFileSize
+            sizeBytes = photoFileSize,
+            isMotionPhoto = isMotion
         )
 
         try {

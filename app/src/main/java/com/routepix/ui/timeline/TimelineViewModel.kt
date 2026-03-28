@@ -14,6 +14,7 @@ import com.routepix.data.model.PhotoMeta
 import com.routepix.data.model.Trip
 import com.routepix.data.remote.RetrofitClient
 import com.routepix.data.repository.TripRepository
+import com.routepix.util.PhotoUtils
 import com.routepix.worker.PhotoUploadWorker
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
@@ -184,7 +185,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
      * Resolve the high-quality download URL for a photo.
      * Uses the document version (original quality) only.
      */
-    private fun resolveDocumentUrl(photo: PhotoMeta): Flow<String?> = activeTrip
+    fun resolveDocumentUrl(photo: PhotoMeta): Flow<String?> = activeTrip
         .filterNotNull()
         .flatMapLatest { trip ->
             flow {
@@ -248,7 +249,8 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             val url = resolveDocumentUrl(photo).firstOrNull()
             if (url != null) {
                 com.routepix.util.ImageDownloadManager.saveToAppStorage(
-                    context, url, "RoutePix_${photo.photoId}.jpg"
+                    context, url, "RoutePix_${photo.photoId}.jpg",
+                    subfolder = photo.tag ?: "Uncategorized"
                 )
                 
                 if (useGallery) {
@@ -284,7 +286,8 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                     val url = resolveDocumentUrl(photo).firstOrNull()
                     if (url != null) {
                         val file = com.routepix.util.ImageDownloadManager.saveToAppStorage(
-                            context, url, "RoutePix_${photo.photoId}.jpg"
+                            context, url, "RoutePix_${photo.photoId}.jpg",
+                            subfolder = photo.tag ?: "Uncategorized"
                         )
                         if (file != null) {
                             if (useGallery) {
@@ -404,6 +407,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             photosFlow().collect { photoList ->
                 _photos.value = photoList
                 resolveUserNames(photoList)
+                scanForMotionPhotos(photoList)
             }
         }
     }
@@ -501,11 +505,14 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     val selectedPhotoIds: StateFlow<Set<String>> = _selectedPhotoIds.asStateFlow()
 
     fun toggleSelection(photoId: String) {
-        val current = _selectedPhotoIds.value
-        _selectedPhotoIds.value = if (photoId in current) {
-            current - photoId
-        } else {
-            current + photoId
+        _selectedPhotoIds.update { current ->
+            if (photoId in current) current - photoId else current + photoId
+        }
+    }
+
+    fun selectAll(photoIds: List<String>) {
+        _selectedPhotoIds.update { current ->
+            current + photoIds
         }
     }
 
@@ -530,6 +537,123 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                 clearSelection()
             } catch (e: Exception) {
                 Log.e("TimelineVM", "Failed to update tags", e)
+            }
+        }
+    }
+
+    fun markAsMotionPhoto(photoId: String) {
+        val tId = _activeTrip.value?.tripId ?: tripId
+        viewModelScope.launch {
+            try {
+                FirebaseFirestore.getInstance()
+                    .collection("trips").document(tId)
+                    .collection("photos").document(photoId)
+                    .update("isMotionPhoto", true)
+                    .await()
+            } catch (e: Exception) {
+                Log.e("TimelineVM", "Failed to mark photo $photoId as motion photo", e)
+            }
+        }
+    }
+
+    // Track which photos we've already scanned to avoid duplicate work
+    private val scannedPhotoIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    
+    companion object {
+        // Application-scoped scope that survives ViewModel destruction
+        private val scanScope = kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + Dispatchers.IO
+        )
+        private val scanMutex = kotlinx.coroutines.sync.Mutex()
+        private var isScanRunning = false
+    }
+
+    /**
+     * Background scan: for photos that have an original (telegramDocumentId) but
+     * isMotionPhoto==false, download the original file and check for an embedded
+     * MP4 ftyp box. If found, permanently update Firestore.
+     * 
+     * Uses a companion-object scope so the scan survives ViewModel destruction.
+     * Uses a Mutex to ensure only one scan runs at a time.
+     */
+    fun scanForMotionPhotos(photos: List<PhotoMeta>) {
+        val candidates = photos.filter {
+            it.telegramDocumentId != null && !it.isMotionPhoto && it.photoId !in scannedPhotoIds
+        }
+        if (candidates.isEmpty()) return
+        if (isScanRunning) return
+        
+        // Mark all candidates upfront
+        candidates.forEach { scannedPhotoIds.add(it.photoId) }
+        
+        // Capture needed values before launching (ViewModel may be destroyed)
+        val tripFlow = _activeTrip
+        val app = getApplication<Application>()
+        val firestore = this.firestore
+        
+        scanScope.launch {
+            if (!scanMutex.tryLock()) return@launch
+            isScanRunning = true
+            try {
+                val trip = tripFlow.filterNotNull().first()
+                val token = getBotToken(trip.adminUid)
+                if (token == null) {
+                    Log.e("TimelineVM", "scanForMotionPhotos: no bot token")
+                    return@launch
+                }
+                Log.d("TimelineVM", "scanForMotionPhotos: scanning ${candidates.size} photos")
+                
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                
+                for (photo in candidates) {
+                    try {
+                        val docId = photo.telegramDocumentId ?: continue
+                        val response = RetrofitClient.telegramApi.getFile(token, docId)
+                        val filePath = response.result?.filePath ?: continue
+                        val url = "https://api.telegram.org/file/bot$token/$filePath"
+                        
+                        val tempFile = java.io.File(
+                            app.cacheDir, 
+                            "motion_scan_${photo.photoId}.tmp"
+                        )
+                        try {
+                            val request = okhttp3.Request.Builder().url(url).build()
+                            client.newCall(request).execute().use { resp ->
+                                resp.body?.byteStream()?.use { input ->
+                                    tempFile.outputStream().use { output -> input.copyTo(output) }
+                                }
+                            }
+                            
+                            val mp4 = PhotoUtils.extractMotionPhotoVideo(app, tempFile)
+                            val hasMotion = mp4 != null
+                            mp4?.delete()
+                            
+                            Log.d("TimelineVM", "scan: ${photo.photoId} hasMotion=$hasMotion (${tempFile.length()} bytes)")
+                            if (hasMotion) {
+                                // Update Firestore directly (ViewModel may be dead)
+                                try {
+                                    firestore.collection("trips").document(photo.tripId)
+                                        .collection("photos").document(photo.photoId)
+                                        .update("isMotionPhoto", true).await()
+                                    Log.d("TimelineVM", "Marked ${photo.photoId} as motion photo")
+                                } catch (e: Exception) {
+                                    Log.e("TimelineVM", "Failed to update Firestore for ${photo.photoId}", e)
+                                }
+                            }
+                        } finally {
+                            tempFile.delete()
+                        }
+                    } catch (e: Exception) {
+                        Log.w("TimelineVM", "Motion scan failed for ${photo.photoId}", e)
+                    }
+                }
+                Log.d("TimelineVM", "scanForMotionPhotos: complete")
+            } finally {
+                isScanRunning = false
+                scanMutex.unlock()
             }
         }
     }
