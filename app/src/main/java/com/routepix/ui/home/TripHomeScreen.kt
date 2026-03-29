@@ -47,10 +47,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
+import com.routepix.ui.components.GlassTopBar
+import com.routepix.ui.components.RoutepixLoader
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 fun TripHomeScreen(
@@ -66,10 +74,14 @@ fun TripHomeScreen(
     var tripToShowMembers by remember { mutableStateOf<Trip?>(null) }
     var tripToExit by remember { mutableStateOf<Trip?>(null) }
     val scope = rememberCoroutineScope()
+    val entryProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entryProgress.animateTo(1f, animationSpec = tween(600, easing = FastOutSlowInEasing))
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            GlassTopBar(
                 title = {
                     Text("RoutePix", fontWeight = FontWeight.ExtraBold)
                 },
@@ -200,7 +212,7 @@ fun TripHomeScreen(
                             .padding(vertical = 32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
+                        RoutepixLoader(modifier = Modifier.size(48.dp), speed = 1800)
                     }
                 }
             }
@@ -349,9 +361,17 @@ private fun ActionCard(
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "card_scale")
+
     Card(
         onClick = onClick,
-        modifier = modifier.height(100.dp),
+        interactionSource = interactionSource,
+        modifier = modifier.height(100.dp).graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = containerColor,
@@ -385,13 +405,24 @@ private fun TripListItem(
     onMembersClick: () -> Unit,
     onExitClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.96f else 1f, label = "card_scale")
     val context = LocalContext.current
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(24.dp))
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                onClick = onClick
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),

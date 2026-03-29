@@ -47,6 +47,14 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.graphics.graphicsLayer
+import com.routepix.ui.components.FullScreenLoaderOverlay
+import com.routepix.ui.components.GlassCard
+import com.routepix.ui.components.RoutepixLoader
+
 @Composable
 fun AuthScreen(
     onNavigateToHome: () -> Unit,
@@ -56,14 +64,24 @@ fun AuthScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val infiniteTransition = rememberInfiniteTransition()
+    // Screen Entry Animation
+    val entryProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entryProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
+        )
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "bg_scroll")
     val scrollOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(
             animation = tween(25000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
-        )
+        ),
+        label = "bg_offset"
     )
 
     val gso = remember {
@@ -86,7 +104,6 @@ fun AuthScreen(
                     authViewModel.signInWithGoogle(idToken)
                 }
             } catch (_: ApiException) {
-
             }
         }
     }
@@ -106,7 +123,8 @@ fun AuthScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.surface
     ) { padding ->
         Box(
             modifier = Modifier
@@ -114,34 +132,27 @@ fun AuthScreen(
                 .padding(padding),
             contentAlignment = Alignment.Center
         ) {
+            // Ambient animated background
+            val c1 = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            val c2 = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+            val c3 = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+            val colors = listOf(c1, c2, c3)
             
-            val c1 = MaterialTheme.colorScheme.primaryContainer
-            val c2 = MaterialTheme.colorScheme.secondaryContainer
-            val c3 = MaterialTheme.colorScheme.tertiaryContainer
-            val c4 = MaterialTheme.colorScheme.surfaceVariant
-            val c5 = MaterialTheme.colorScheme.primary
-            val c6 = MaterialTheme.colorScheme.secondary
-            val c7 = MaterialTheme.colorScheme.tertiary
-
-            val colors = listOf(c1, c2, c3, c4, c5, c6, c7)
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val boxWidth = 140.dp.toPx()
                 val spacing = 16.dp.toPx()
                 val totalW = boxWidth + spacing
-                // Move from top-right to bottom-left
                 val shift = scrollOffset % totalW
                 translate(left = -shift, top = shift) {
                     for (i in -2..((size.width / totalW).toInt() + 3)) {
                         for (j in -4..((size.height / totalW).toInt() + 2)) {
-                            // Pseudo-random but deterministic size multiplier for staggered grid
                             val randVariant = (i * 17 + j * 31).absoluteValue % 3
                             val boxHeight = boxWidth * (1f + randVariant * 0.5f)
-                            
                             val colorIdx = (i * 7 + j * 11).absoluteValue % colors.size
                             val topOffset = j * totalW + (if (i % 2 != 0) totalW / 2 else 0f)
 
                             drawRoundRect(
-                                color = colors[colorIdx].copy(alpha = 0.4f),
+                                color = colors[colorIdx],
                                 topLeft = Offset(i * totalW, topOffset),
                                 size = Size(boxWidth, boxHeight),
                                 cornerRadius = CornerRadius(16.dp.toPx())
@@ -151,52 +162,80 @@ fun AuthScreen(
                 }
             }
             
-            // Content layer
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+            // Content layer with Entry Animation (Fade + Slide Up)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
-                    .padding(32.dp)
+                    .graphicsLayer {
+                        alpha = entryProgress.value
+                        translationY = (1f - entryProgress.value) * 40.dp.toPx()
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "RoutePix",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Share your trip photos\nvia Telegram",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(48.dp))
-
-                if (authState is AuthState.Loading) {
-                    CircularProgressIndicator(modifier = Modifier.size(48.dp))
-                } else if (authState !is AuthState.Success) {
-                    Button(
-                        onClick = {
-                            signInLauncher.launch(googleSignInClient.signInIntent)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
+                GlassCard(
+                    modifier = Modifier.wrapContentSize(),
+                    cornerRadius = 32.dp,
+                    opacity = 0.75f
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(36.dp)
                     ) {
                         Text(
-                            text = "Continue with Google",
-                            style = MaterialTheme.typography.labelLarge
+                            text = "RoutePix",
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "Share your trip photos\nvia Telegram",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(48.dp))
+
+                        if (authState !is AuthState.Success) {
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isPressed by interactionSource.collectIsPressedAsState()
+                            val scale by animateFloatAsState(
+                                targetValue = if (isPressed) 0.93f else 1f,
+                                label = "button_scale"
+                            )
+
+                            Button(
+                                onClick = {
+                                    signInLauncher.launch(googleSignInClient.signInIntent)
+                                },
+                                interactionSource = interactionSource,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    },
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Text(
+                                    text = "Continue with Google",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
+            }
+            
+            // Full-screen overlay when loading
+            if (authState is AuthState.Loading) {
+                FullScreenLoaderOverlay(label = "Signing in...")
             }
         }
     }

@@ -11,7 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -23,6 +28,7 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.routepix.data.model.PhotoMeta
+import com.routepix.ui.components.RoutepixLoader
 import com.routepix.util.PhotoUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,7 +46,7 @@ fun OriginalViewerScreen(
 
     if (photo == null) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+            RoutepixLoader(modifier = Modifier.size(48.dp), speed = 1800)
         }
         return
     }
@@ -146,47 +152,77 @@ fun OriginalViewerScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
-                    // Central spinner
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        modifier = Modifier.size(32.dp),
-                        strokeWidth = 3.dp
+                    // Central loader
+                    RoutepixLoader(
+                        modifier = Modifier.align(Alignment.Center),
+                        size = 48.dp
                     )
                 }
             } else {
                 // ── Standard Photo Flow ──
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    // Thumbnail as placeholder
-                    TelegramAsyncImage(
-                        photo = photo,
-                        botToken = "",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
+                var scale by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(1f) }
+                var offset by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
 
-                    // Original quality overlay with crossfade
-                    if (localOriginalFile != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(localOriginalFile) // use the already downloaded local file
-                                .crossfade(400)
-                                .listener(
-                                    onSuccess = { _, _ -> isOriginalLoaded = true }
-                                )
-                                .build(),
-                            contentDescription = "Original Photo",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                if (scale > 1f) {
+                                    offset = Offset(offset.x + pan.x, offset.y + pan.y)
+                                } else {
+                                    offset = Offset.Zero
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    scale = if (scale > 1f) 1f else 2.5f
+                                    offset = Offset.Zero
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.fillMaxSize().graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    }) {
+                        // Thumbnail as placeholder
+                        TelegramAsyncImage(
+                            photo = photo,
+                            botToken = "",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
                         )
+
+                        // Original quality overlay with crossfade
+                        if (localOriginalFile != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(localOriginalFile) // use the already downloaded local file
+                                    .crossfade(400)
+                                    .listener(
+                                        onSuccess = { _, _ -> isOriginalLoaded = true }
+                                    )
+                                    .build(),
+                                contentDescription = "Original Photo",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
 
                 // Central spinner while loading
                 if (!isOriginalLoaded) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        modifier = Modifier.size(32.dp),
-                        strokeWidth = 3.dp
+                    RoutepixLoader(
+                        modifier = Modifier.align(Alignment.Center),
+                        size = 48.dp
                     )
                 }
             }
@@ -227,21 +263,25 @@ private fun MotionPhotoPlayer(videoFile: java.io.File) {
         )
 
         // Mute/Unmute toggle
-        IconButton(
+        Surface(
             onClick = {
                 isMuted = !isMuted
                 exoPlayer.volume = if (isMuted) 0f else 1f
             },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+            color = Color.Black.copy(alpha = 0.5f),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(50))
+                .padding(24.dp)
         ) {
-            Icon(
-                imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                contentDescription = if (isMuted) "Unmute" else "Mute",
-                tint = Color.White
-            )
+            Box(modifier = Modifier.padding(12.dp)) {
+                Icon(
+                    imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                    contentDescription = if (isMuted) "Unmute" else "Mute",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }

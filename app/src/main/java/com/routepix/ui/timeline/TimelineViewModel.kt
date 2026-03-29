@@ -407,7 +407,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             photosFlow().collect { photoList ->
                 _photos.value = photoList
                 resolveUserNames(photoList)
-                scanForMotionPhotos(photoList)
+                // Note: scanForMotionPhotos was removed due to excessive data usage when downloading full originals in the background.
             }
         }
     }

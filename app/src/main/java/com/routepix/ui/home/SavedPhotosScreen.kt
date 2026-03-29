@@ -23,6 +23,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,6 +53,14 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import com.routepix.ui.components.GlassTopBar
+import com.routepix.ui.components.RoutepixLoader
 
 @Composable
 fun SavedPhotosScreen(
@@ -63,6 +72,15 @@ fun SavedPhotosScreen(
     val activeDownloads by ImageDownloadManager.activeDownloads.collectAsState()
     var selectedFiles by remember { mutableStateOf<Set<File>>(emptySet()) }
     var selectedPhotoIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+
+    // Screen Entry Animation
+    val entryProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entryProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadSavedPhotos(context)
@@ -79,22 +97,22 @@ fun SavedPhotosScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            GlassTopBar(
                 title = {
                     if (selectedFiles.isEmpty()) {
-                        Text("Saved Photos", fontWeight = FontWeight.Bold)
+                        Text("Saved Photos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     } else {
-                        Text("${selectedFiles.size} selected")
+                        Text("${selectedFiles.size} selected", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
                 },
                 navigationIcon = {
                     if (selectedFiles.isNotEmpty()) {
                         IconButton(onClick = { selectedFiles = emptySet() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Clear Selection")
+                            Icon(Icons.Default.Close, contentDescription = "Clear Selection")
                         }
                     } else {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
@@ -126,35 +144,42 @@ fun SavedPhotosScreen(
                     }
                 }
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     ) { padding ->
         if (savedPhotos.isEmpty() && activeDownloads.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = entryProgress.value
+                    translationY = (1f - entryProgress.value) * 40.dp.toPx()
+                }
+                .padding(padding)
+        ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Icon(
                         Icons.Default.ImageSearch,
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        modifier = Modifier.size(80.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         "No saved photos found",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "Download photos from your trips to see them here offline.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp)
+                        color = MaterialTheme.colorScheme.outline,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -168,17 +193,22 @@ fun SavedPhotosScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 grouped.forEach { (tag, photos) ->
-                    // Tag header
+                    // Tag header as pill
                     item(span = { GridItemSpan(3) }) {
-                        Text(
-                            text = tag,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                                .padding(top = if (tag == grouped.keys.first()) 0.dp else 8.dp)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                .padding(top = if (tag == grouped.keys.first()) 4.dp else 16.dp)
+                        ) {
+                            Text(
+                                text = tag,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+                        }
                     }
 
                     items(photos, key = { it.file.absolutePath }) { savedPhoto ->
@@ -186,10 +216,23 @@ fun SavedPhotosScreen(
                         val isSelected = file in selectedFiles
                         val globalIndex = flatPhotos.indexOf(savedPhoto)
 
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isPressed by interactionSource.collectIsPressedAsState()
+                        val itemScale by animateFloatAsState(
+                            targetValue = if (isPressed) 0.94f else 1f,
+                            label = "grid_scale"
+                        )
+
                         Box(
                             modifier = Modifier
                                 .aspectRatio(1f)
+                                .graphicsLayer {
+                                    scaleX = itemScale
+                                    scaleY = itemScale
+                                }
                                 .combinedClickable(
+                                    interactionSource = interactionSource,
+                                    indication = androidx.compose.foundation.LocalIndication.current,
                                     onClick = {
                                         if (selectedFiles.isNotEmpty()) {
                                             if (isSelected) selectedFiles -= file else selectedFiles += file
@@ -312,10 +355,24 @@ private fun SavedPhotoViewer(
             .fillMaxSize()
             .background(Color.Black)
     ) {
+        var canPlayMotion by remember { mutableStateOf(false) }
+
+        LaunchedEffect(currentPhoto) {
+            if (currentPhoto != null) {
+                val result = withContext(Dispatchers.IO) {
+                    PhotoUtils.isMotionPhoto(context, android.net.Uri.fromFile(currentPhoto.file))
+                }
+                canPlayMotion = result
+            } else {
+                canPlayMotion = false
+            }
+        }
+
         if (motionVideoFile != null) {
             // Motion photo player
             SavedMotionPhotoPlayer(videoFile = motionVideoFile!!)
         } else {
+
             // Photo pager
             HorizontalPager(
                 state = pagerState,
@@ -371,10 +428,9 @@ private fun SavedPhotoViewer(
 
             // Loading spinner for motion check
             if (isCheckingMotion) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    modifier = Modifier.size(32.dp).align(Alignment.Center),
-                    strokeWidth = 3.dp
+                RoutepixLoader(
+                    modifier = Modifier.align(Alignment.Center),
+                    size = 48.dp
                 )
             }
         }
@@ -384,8 +440,9 @@ private fun SavedPhotoViewer(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
+                .statusBarsPadding()
                 .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
@@ -398,60 +455,64 @@ private fun SavedPhotoViewer(
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
+        }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Motion photo / view original button
-                if (currentPhoto != null && motionVideoFile == null) {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                isCheckingMotion = true
-                                val mp4 = withContext(Dispatchers.IO) {
-                                    PhotoUtils.extractMotionPhotoVideo(context, currentPhoto.file)
-                                }
-                                if (mp4 != null) {
-                                    motionVideoFile = mp4
-                                }
-                                isCheckingMotion = false
-                            }
-                        },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    ) {
-                        Icon(Icons.Default.PlayCircle, contentDescription = "Play Motion Photo", tint = Color.White)
-                    }
-                } else if (motionVideoFile != null) {
-                    // Back to still photo
-                    IconButton(
-                        onClick = {
-                            motionVideoFile?.delete()
-                            motionVideoFile = null
-                        },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    ) {
-                        Icon(Icons.Default.Photo, contentDescription = "View Photo", tint = Color.White)
-                    }
-                }
-
-                // Share
-                if (currentPhoto != null) {
-                    IconButton(
-                        onClick = { onShare(currentPhoto) },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
-                    }
-                }
-
-                // Delete
+        // Action Buttons Row (Bottom Center above page indicator)
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 72.dp)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Motion photo button
+            if (currentPhoto != null && motionVideoFile == null && canPlayMotion) {
                 IconButton(
-                    onClick = { showConfirmDelete = true },
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    onClick = {
+                        scope.launch {
+                            isCheckingMotion = true
+                            val mp4 = withContext(Dispatchers.IO) {
+                                PhotoUtils.extractMotionPhotoVideo(context, currentPhoto.file)
+                            }
+                            if (mp4 != null) {
+                                motionVideoFile = mp4
+                            } else {
+                                android.widget.Toast.makeText(context, "No motion photo data found", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                            isCheckingMotion = false
+                        }
+                    }
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                    Icon(Icons.Default.PlayCircle, contentDescription = "Play Motion Photo", tint = Color.White)
                 }
+            } else if (motionVideoFile != null) {
+                // Back to still photo
+                IconButton(
+                    onClick = {
+                        motionVideoFile?.delete()
+                        motionVideoFile = null
+                    }
+                ) {
+                    Icon(Icons.Default.Photo, contentDescription = "View Photo", tint = Color.White)
+                }
+            }
+
+            // Share
+            if (currentPhoto != null) {
+                IconButton(
+                    onClick = { onShare(currentPhoto) }
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
+                }
+            }
+
+            // Delete
+            IconButton(
+                onClick = { showConfirmDelete = true }
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
             }
         }
 

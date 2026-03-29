@@ -44,6 +44,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import com.routepix.ui.components.GlassTopBar
+import com.routepix.ui.components.RoutepixLoader
 
 @Composable
 fun CreateTripScreen(
@@ -59,6 +68,15 @@ fun CreateTripScreen(
 
     var name by rememberSaveable { mutableStateOf("") }
     val isFormValid = name.isNotBlank() && hasCredentials
+
+    // Screen Entry Animation
+    val entryProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entryProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
+        )
+    }
 
     LaunchedEffect(state) {
         val s = state
@@ -77,8 +95,8 @@ fun CreateTripScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Create Trip", fontWeight = FontWeight.SemiBold) },
+            GlassTopBar(
+                title = { Text("Create Trip", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -86,11 +104,16 @@ fun CreateTripScreen(
                 }
             )
         },
+        containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer {
+                    alpha = entryProgress.value
+                    translationY = (1f - entryProgress.value) * 40.dp.toPx()
+                }
                 .padding(padding)
                 .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState())
@@ -140,21 +163,33 @@ fun CreateTripScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            val interactionSource = remember { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val buttonScale by animateFloatAsState(
+                targetValue = if (isPressed) 0.96f else 1f,
+                label = "button_scale"
+            )
+
             Button(
                 onClick = { viewModel.createTrip(name.trim()) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .graphicsLayer {
+                        scaleX = buttonScale
+                        scaleY = buttonScale
+                    },
+                interactionSource = interactionSource,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                 enabled = isFormValid && state !is CreateTripState.Loading
             ) {
                 if (state is CreateTripState.Loading) {
-                    CircularProgressIndicator(
+                    RoutepixLoader(
                         modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
+                        speed = 1800
                     )
                 } else {
-                    Text("Create Trip", fontWeight = FontWeight.Bold)
+                    Text("Create Trip", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
             }
 

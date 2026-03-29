@@ -39,11 +39,19 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.routepix.ui.home.SavedPhotosScreen
 
+import androidx.activity.SystemBarStyle
+import androidx.compose.ui.graphics.toArgb
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SecurityManager.init(applicationContext)
-        enableEdgeToEdge()
+        
+        // Enable edge-to-edge with transparent bars
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        )
 
         // Check for app updates in the background
         lifecycleScope.launch {
@@ -52,8 +60,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             RoutepixTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    RoutepixNavHost(modifier = Modifier.padding(innerPadding))
+                // Root scaffold now ignores default insets to allow GlassTopBar to flow behind status bar
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
+                ) { innerPadding ->
+                    // Content still respects horizontal padding if needed, but we handle vertical insets in screens
+                    RoutepixNavHost(modifier = Modifier.fillMaxSize())
                 }
             }
         }

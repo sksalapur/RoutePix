@@ -14,8 +14,8 @@ android {
         applicationId = "com.routepix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "2.2.0"
+        versionCode = 17
+        versionName = "2.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -104,6 +104,7 @@ dependencies {
 
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
+
 
     // Testing
     testImplementation("junit:junit:4.13.2")

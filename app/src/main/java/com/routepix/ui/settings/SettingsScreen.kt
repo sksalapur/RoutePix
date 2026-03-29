@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -35,6 +36,15 @@ import android.net.Uri
 import com.routepix.R
 import com.routepix.data.model.User
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import com.routepix.ui.components.GlassTopBar
+import com.routepix.ui.components.RoutepixLoader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +64,15 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // Screen Entry Animation
+    val entryProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entryProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
+        )
+    }
 
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
@@ -98,31 +117,36 @@ fun SettingsScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+            GlassTopBar(
+                title = { Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    TextButton(onClick = { isEditing = !isEditing }) {
+                    TextButton(
+                        onClick = { isEditing = !isEditing },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
                         if (isEditing) {
-                            Text("Cancel", color = MaterialTheme.colorScheme.error)
+                            Text("Cancel", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                         } else {
-                            Text("Edit Profile")
+                            Text("Edit Profile", fontWeight = FontWeight.Bold)
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer {
+                    alpha = entryProgress.value
+                    translationY = (1f - entryProgress.value) * 40.dp.toPx()
+                }
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
@@ -209,31 +233,59 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             if (isEditing) {
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val buttonScale by animateFloatAsState(
+                    targetValue = if (isPressed) 0.96f else 1f,
+                    label = "save_scale"
+                )
+
                 Button(
                     onClick = { viewModel.saveSettings(displayName, botToken, chatId, showInGallery) },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .graphicsLayer {
+                            scaleX = buttonScale
+                            scaleY = buttonScale
+                        },
+                    interactionSource = interactionSource,
                     shape = RoundedCornerShape(16.dp),
                     enabled = !uiState.isSaving
                 ) {
                     if (uiState.isSaving) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        RoutepixLoader(modifier = Modifier.size(24.dp), speed = 1800)
                     } else {
-                        Text("Save Changes", fontWeight = FontWeight.Bold)
+                        Text("Save Changes", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            val logoutInteractionSource = remember { MutableInteractionSource() }
+            val isLogoutPressed by logoutInteractionSource.collectIsPressedAsState()
+            val logoutScale by animateFloatAsState(
+                targetValue = if (isLogoutPressed) 0.96f else 1f,
+                label = "logout_scale"
+            )
+
             OutlinedButton(
                 onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .graphicsLayer {
+                        scaleX = logoutScale
+                        scaleY = logoutScale
+                    },
+                interactionSource = logoutInteractionSource,
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
             ) {
                 Icon(Icons.Default.ExitToApp, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Logout", fontWeight = FontWeight.Bold)
+                Text("Logout", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             }
             
             Spacer(modifier = Modifier.weight(1f))

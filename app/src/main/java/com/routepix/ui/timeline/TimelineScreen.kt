@@ -99,6 +99,21 @@ import coil.compose.AsyncImage
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.routepix.data.model.PhotoMeta
 import com.routepix.ui.picker.PhotoPickerViewModel
+import android.view.View
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import com.routepix.ui.components.FullScreenLoaderOverlay
+import com.routepix.ui.components.GlassBottomSheetContent
+import com.routepix.ui.components.GlassTopBar
+import com.routepix.ui.components.RoutepixLoader
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -127,93 +142,105 @@ fun TimelineScreen(
     var showTagEditSheet by rememberSaveable { mutableStateOf(false) }
     var tagToEdit by rememberSaveable { mutableStateOf("") }
 
+    // Screen Entry Animation
+    val entryProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entryProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
+        )
+    }
+
     if (showTagEditSheet) {
         ModalBottomSheet(
             onDismissRequest = { showTagEditSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.Transparent,
+            dragHandle = null
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Move to Tag",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Select an existing tag or enter a new one",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-                )
-
-                OutlinedTextField(
-                    value = tagToEdit,
-                    onValueChange = { tagToEdit = it },
-                    placeholder = { Text("New tag name...") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    trailingIcon = {
-                        if (tagToEdit.isNotBlank()) {
-                            IconButton(onClick = {
-                                timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), tagToEdit)
-                                showTagEditSheet = false
-                                timelineViewModel.clearSelection()
-                                selectedGroupKey = null
-                                tagToEdit = ""
-                            }) {
-                                Icon(Icons.Default.Check, contentDescription = "Add Tag", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                )
-
-                if (availableTags.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
+            GlassBottomSheetContent {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "Or choose existing:",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Start)
+                        text = "Move to Tag",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 200.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(availableTags) { tag ->
-                            Surface(
-                                onClick = {
-                                    timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), tag)
+                    Text(
+                        text = "Select an existing tag or enter a new one",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = tagToEdit,
+                        onValueChange = { tagToEdit = it },
+                        placeholder = { Text("New tag name...") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            if (tagToEdit.isNotBlank()) {
+                                IconButton(onClick = {
+                                    timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), tagToEdit)
                                     showTagEditSheet = false
                                     timelineViewModel.clearSelection()
                                     selectedGroupKey = null
                                     tagToEdit = ""
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = tag,
-                                    modifier = Modifier.padding(16.dp),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                }) {
+                                    Icon(Icons.Default.Check, contentDescription = "Add Tag", tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    )
+
+                    if (availableTags.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Or choose existing:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.Start)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(availableTags) { tag ->
+                                Surface(
+                                    onClick = {
+                                        timelineViewModel.updatePhotoTags(selectedPhotoIds.toList(), tag)
+                                        showTagEditSheet = false
+                                        timelineViewModel.clearSelection()
+                                        selectedGroupKey = null
+                                        tagToEdit = ""
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        modifier = Modifier.padding(16.dp),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -358,17 +385,19 @@ fun TimelineScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            GlassTopBar(
                 title = {
                     if (selectedPhotoIds.isEmpty()) {
                         Text(
                             text = selectedGroupKey ?: activeTrip?.name ?: "Timeline",
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
                     } else {
                         Text(
                             text = "${selectedPhotoIds.size} selected",
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 },
@@ -476,12 +505,10 @@ fun TimelineScreen(
                             }
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         },
+        containerColor = MaterialTheme.colorScheme.surface,
         floatingActionButton = {
             var expanded by remember { mutableStateOf(false) }
 
@@ -531,12 +558,22 @@ fun TimelineScreen(
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = entryProgress.value
+                    translationY = (1f - entryProgress.value) * 40.dp.toPx()
+                }
+        ) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
             if (photos.isEmpty()) {
-                EmptyTimelineState(modifier = Modifier.fillMaxSize())
+                EmptyTimelineState(
+                    modifier = Modifier.fillMaxSize()
+                        .padding(padding)
+                )
             } else {
                 Crossfade(
                     targetState = selectedGroupKey,
@@ -566,16 +603,34 @@ fun TimelineScreen(
                                                 }
                                             }
                                         },
-                                    contentPadding = PaddingValues(bottom = 80.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    contentPadding = PaddingValues(
+                                        top = padding.calculateTopPadding() + 16.dp,
+                                        bottom = padding.calculateBottomPadding() + 80.dp,
+                                        start = 4.dp,
+                                        end = 4.dp
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     items(albumPhotos, key = { it.photoId }) { photo ->
                                         val isSelected = photo.photoId in selectedPhotoIds
+                                        val interactionSource = remember { MutableInteractionSource() }
+                                        val isPressed by interactionSource.collectIsPressedAsState()
+                                        val itemScale by animateFloatAsState(
+                                            targetValue = if (isPressed) 0.94f else 1f,
+                                            label = "grid_scale"
+                                        )
+
                                         Box(
                                             modifier = Modifier
                                                 .aspectRatio(1f)
+                                                .graphicsLayer {
+                                                    scaleX = itemScale
+                                                    scaleY = itemScale
+                                                }
                                                 .combinedClickable(
+                                                    interactionSource = interactionSource,
+                                                    indication = androidx.compose.foundation.LocalIndication.current,
                                                     onClick = {
                                                         if (selectedPhotoIds.isNotEmpty()) timelineViewModel.toggleSelection(photo.photoId)
                                                         else {
@@ -609,6 +664,10 @@ fun TimelineScreen(
                             } else {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        top = padding.calculateTopPadding() + 16.dp,
+                                        bottom = padding.calculateBottomPadding() + 80.dp
+                                    ),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     items(albumPhotos.size, key = { albumPhotos[it].photoId }) { index ->
@@ -641,7 +700,10 @@ fun TimelineScreen(
                             modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 80.dp)
+                             contentPadding = PaddingValues(
+                                 top = padding.calculateTopPadding() + 16.dp,
+                                 bottom = padding.calculateBottomPadding() + 80.dp
+                             )
                         ) {
                             items(grouped.keys.toList(), key = { it }) { groupKey ->
                                 val groupPhotos = grouped[groupKey] ?: emptyList()
@@ -700,43 +762,8 @@ fun TimelineScreen(
             // Processing overlay — shown immediately after confirming photo selection,
             // before the bottom progress bar activates
             val showProcessingOverlay = pickerQueueState.isProcessing && !uploadProgress.isActive
-            AnimatedVisibility(
-                visible = showProcessingOverlay,
-                enter = androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.fadeOut(),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.92f),
-                        tonalElevation = 8.dp,
-                        modifier = Modifier.size(120.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(40.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 3.dp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "Processing…",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.DarkGray
-                            )
-                        }
-                    }
-                }
+            if (showProcessingOverlay) {
+                FullScreenLoaderOverlay(label = "Processing...")
             }
         } // end Box
     } // end Scaffold
@@ -1047,15 +1074,20 @@ private fun SortModeSelector(
 
 @Composable
 private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primaryContainer,
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    )
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+        )
+    }
 }
 
 @Composable
@@ -1128,10 +1160,22 @@ private fun PhotoRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by animateFloatAsState(
+        targetValue = if (interactionSource.collectIsPressedAsState().value) 0.96f else 1f,
+        label = "row_scale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = isPressed
+                scaleY = isPressed
+            }
             .combinedClickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = onClick,
                 onLongClick = onLongClick
             )
@@ -1330,22 +1374,26 @@ private fun EmptyTimelineState(modifier: Modifier = Modifier) {
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
             Icon(
-                imageVector = Icons.Default.Star,
+                imageVector = Icons.Default.PhotoLibrary,
                 contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.outlineVariant
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "No photos yet",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Your trip photos will appear here.",
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Tap + to add your first trip photo",
+                text = "Add photos to start sharing the journey.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center
@@ -1371,8 +1419,10 @@ private fun TagBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        dragHandle = null,
+        containerColor = Color.Transparent
     ) {
+        GlassBottomSheetContent {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1442,6 +1492,7 @@ private fun TagBottomSheet(
             ) {
                 Text("Upload Photos")
             }
+        }
         }
     }
 }
@@ -1584,8 +1635,9 @@ private fun PhotoPagerOverlay(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
+                .statusBarsPadding()
                 .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
@@ -1594,53 +1646,55 @@ private fun PhotoPagerOverlay(
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
-            
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+        }
+
+        // Action Buttons Row (Bottom Center above thumbnail strip)
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 120.dp) // Padded above the thumbnail surface
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // View Original / Motion button
+            val currentPhoto = photoList[pagerState.currentPage]
+            if (currentPhoto.isMotionPhoto || currentPhoto.telegramDocumentId != null) {
+                IconButton(
+                    onClick = {
+                        onNavigateToOriginal(currentPhoto.photoId)
+                    }
+                ) {
+                    if (currentPhoto.isMotionPhoto) {
+                        Icon(Icons.Default.PlayCircle, contentDescription = "View Motion Photo", tint = Color.White)
+                    } else {
+                        Icon(Icons.Default.HighQuality, contentDescription = "View Original Quality", tint = Color.White)
+                    }
+                }
+            }
+            IconButton(
+                onClick = { 
+                    timelineViewModel.sharePhotos(context, listOf(photoList[pagerState.currentPage])) 
+                }
             ) {
-                // View Original / Motion button
-                val currentPhoto = photoList[pagerState.currentPage]
-                if (currentPhoto.isMotionPhoto || currentPhoto.telegramDocumentId != null) {
-                    IconButton(
-                        onClick = {
-                            onNavigateToOriginal(currentPhoto.photoId)
-                        },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    ) {
-                        if (currentPhoto.isMotionPhoto) {
-                            Icon(Icons.Default.PlayCircle, contentDescription = "View Motion Photo", tint = Color.White)
-                        } else {
-                            Icon(Icons.Default.HighQuality, contentDescription = "View Original Quality", tint = Color.White)
-                        }
-                    }
+                Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
+            }
+            IconButton(
+                onClick = { 
+                    timelineViewModel.downloadPhoto(context, photoList[pagerState.currentPage]) 
                 }
+            ) {
+                Icon(Icons.Default.Download, contentDescription = "Download", tint = Color.White)
+            }
+            if (isAdmin) {
                 IconButton(
                     onClick = { 
-                        timelineViewModel.sharePhotos(context, listOf(photoList[pagerState.currentPage])) 
-                    },
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
-                }
-                IconButton(
-                    onClick = { 
-                        timelineViewModel.downloadPhoto(context, photoList[pagerState.currentPage]) 
-                    },
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = "Download", tint = Color.White)
-                }
-                if (isAdmin) {
-                    IconButton(
-                        onClick = { 
-                        timelineViewModel.deletePhoto(photoList[pagerState.currentPage].photoId)
-                        if (photoList.size <= 1) onClose()
-                        },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                    timelineViewModel.deletePhoto(photoList[pagerState.currentPage].photoId)
+                    if (photoList.size <= 1) onClose()
                     }
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
                 }
             }
         }
