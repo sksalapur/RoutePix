@@ -51,7 +51,7 @@ Every photo sharing solution compromises on something:
 │  │  Persistent, survives app kills & reboots    │               │
 │  └──────────────┬───────────────────────────────┘               │
 │                 │ Sequential, one-by-one                        │
-│                 ▼                                                │
+│                 ▼                                               │
 │  ┌──────────────────────────────────────────────┐               │
 │  │  Dual-Format Upload Engine                   │               │
 │  │                                              │               │
@@ -68,8 +68,8 @@ Every photo sharing solution compromises on something:
 │  │  → photoId, tripId, telegramFileId,          │               │
 │  │    telegramDocumentId, md5Hash, EXIF data    │               │
 │  └──────────────────────────────────────────────┘               │
-│                 │                                                │
-│                 ▼                                                │
+│                 │                                               │
+│                 ▼                                               │
 │        Telegram Bot Chat                                        │
 │   (Admin's private bot = free ∞ storage)                        │
 └─────────────────────────────────────────────────────────────────┘
