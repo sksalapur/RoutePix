@@ -1,99 +1,198 @@
-# 📸 RoutePix
+<p align="center">
+  <img src="app/src/main/res/drawable/ic_launcher_master.png" alt="RoutePix Logo" width="120" />
+</p>
 
-**Collaborative Trip Photo Sharing & Telegram Backup**
+<h1 align="center">📸 RoutePix</h1>
 
-RoutePix is a modern Android app for collaborative trip photo management. It combines a premium gallery experience with automated Telegram backups, ensuring your travel memories are always safe, organized, and under your control.
+<p align="center">
+  <strong>The only collaborative photo app that uses Telegram as free, unlimited cloud storage.</strong>
+</p>
+
+<p align="center">
+  <em>No subscriptions. No server costs. No compression. Your photos, your bot, your rules.</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Kotlin-2.0+-7F52FF?logo=kotlin&logoColor=white" />
+  <img src="https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?logo=jetpackcompose&logoColor=white" />
+  <img src="https://img.shields.io/badge/Firebase-Auth_%7C_Firestore-FFCA28?logo=firebase&logoColor=black" />
+  <img src="https://img.shields.io/badge/Telegram_Bot_API-Storage_Engine-26A5E4?logo=telegram&logoColor=white" />
+  <img src="https://img.shields.io/badge/Releases-12+-brightgreen" />
+</p>
 
 ---
 
-## 🔒 Privacy & Security First
+## 🤔 The Problem
 
-**Your Data, Your Bot, Your Rules.**
-Unlike traditional cloud photo services, RoutePix does **not** upload your photos to random third-party servers. 
-- **Decentralized Storage:** Every photo uploaded in a trip is sent directly to the **Admin's own Telegram Bot**.
-- **Self-Hosted Backup:** You own the bot, you own the storage. The app simply acts as a gorgeous gallery interface over your personal Telegram chat.
-- **Credential Isolation:** Non-admin members seamlessly upload to the admin's bot using per-trip cached credentials, completely isolating your primary bot token from their devices.
+Every photo sharing solution compromises on something:
+
+| Solution | The Catch |
+|----------|-----------|
+| Google Photos | Free tier eliminated. 15 GB shared across Gmail, Drive, Photos. Paid beyond that. |
+| WhatsApp / Telegram Groups | Aggressive lossy compression. No original quality. No organization. |
+| iCloud / OneDrive | Platform-locked. No cross-platform collaboration. |
+| Self-hosted (NAS) | Requires hardware, networking knowledge, and ongoing maintenance. |
+
+**RoutePix eliminates all of these trade-offs.** It repurposes the Telegram Bot API — which offers unlimited, free file storage up to 50 MB per file — as a zero-cost, decentralized cloud backend. There is no other app like this.
+
+---
+
+## ⚡ How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        RoutePix App                             │
+│                                                                 │
+│  User selects 200 photos from gallery                           │
+│       │                                                         │
+│       ▼                                                         │
+│  ┌──────────────────────────────────────────────┐               │
+│  │  WorkManager Upload Queue (Room DB)          │               │
+│  │  Persistent, survives app kills & reboots    │               │
+│  └──────────────┬───────────────────────────────┘               │
+│                 │ Sequential, one-by-one                        │
+│                 ▼                                                │
+│  ┌──────────────────────────────────────────────┐               │
+│  │  Dual-Format Upload Engine                   │               │
+│  │                                              │               │
+│  │  Step 1: sendPhoto API                       │               │
+│  │  → Compressed thumbnail for fast browsing    │               │
+│  │  → Coil CDN-cached for instant gallery loads │               │
+│  │                                              │               │
+│  │  Step 2: sendDocument API                    │               │
+│  │  → Byte-perfect original (≤50 MB)            │               │
+│  │  → Motion Photos with embedded video intact  │               │
+│  │  → Files >50MB auto-compressed to fit limit  │               │
+│  │                                              │               │
+│  │  Step 3: Firestore Metadata Write            │               │
+│  │  → photoId, tripId, telegramFileId,          │               │
+│  │    telegramDocumentId, md5Hash, EXIF data    │               │
+│  └──────────────────────────────────────────────┘               │
+│                 │                                                │
+│                 ▼                                                │
+│        Telegram Bot Chat                                        │
+│   (Admin's private bot = free ∞ storage)                        │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## ✨ Features
 
-- **Collaborative Trips** — Create or join trips via invite codes. All members can upload photos together.
-- **Bulk & Folder Uploads** — Select an entire folder or hundreds of photos at once. Photos upload one-by-one safely in the background.
-- **Original Quality Preservation** — Every photo is uploaded twice: once as a compressed thumbnail for fast in-app browsing, and once as a full-quality document for downloads. Files under 50MB are preserved byte-for-byte — including Motion Photos with embedded video. Files over 50MB are intelligently compressed to just under the Telegram limit while maintaining maximum visual fidelity.
-- **Smart Albums** — Photos are auto-grouped by tag, date, or uploader.
-- **Gesture-Driven Gallery** — Premium photo viewer with horizontal swiping, swipe-to-dismiss, pinch-to-zoom, and a bottom filmstrip for seamless navigation.
-- **Multi-Select for Everyone** — All trip members can long-press to select multiple photos for bulk download. Deletion remains admin-only.
-- **Fluid Navigation** — Smooth crossfade transitions, slide animations, and Android predictive back gesture support.
-- **Automatic Update Alerts** — The app checks GitHub for newer releases on startup and notifies you with a direct download link.
-- **Download & Organize** — Download individual photos or entire albums in original quality, saved straight to your device.
+### 📸 Collaborative Trip Albums
+- Create a trip → get an invite code → share with friends → everyone uploads to the same album.
+- All photos are backed up to a single Telegram Bot owned by the trip admin — **zero server costs**.
+
+### 🔐 Security Architecture
+- **AES-256-GCM encryption** for Telegram credentials stored in Firestore, with SHA-256 derived keys.
+- **AndroidX EncryptedSharedPreferences** for local bot token isolation per trip.
+- **Credential cascading**: Non-admin members upload using per-trip cached credentials — the admin's master token never touches their device.
+
+### 🖼️ Premium Gallery Engine
+- **Custom Coil ImageLoader** with aggressive Telegram CDN caching: 25% memory pool allocation, disk caching keyed by `telegramFileId`, shimmer loading placeholders.
+- **Gesture-driven viewer**: Horizontal swipe between photos, vertical swipe-to-dismiss, pinch-to-zoom, bottom filmstrip for fast navigation, crossfade transitions.
+- **Smart album sorting**: Group by Tag, by Uploader, or by Date — all with animated transitions.
+
+### 📤 Bulletproof Upload Pipeline
+- **Room database queue** → **WorkManager** → sequential upload with per-photo progress tracking.
+- Survives app kills, process death, and device reboots. No photo ever gets lost.
+- Foreground notification with real-time `uploaded/total` progress.
+- **Automatic retry** with exponential backoff for rate limits (HTTP 429) and timeouts.
+
+### 🔄 In-App Auto-Updates
+- Checks GitHub Releases API on every launch for newer versions.
+- One-tap APK download link — no Play Store dependency.
 
 ---
 
-## 🚀 Installation & Setup
+## 🛠️ Tech Stack
 
-### 1. The Play Protect Popup
-Since RoutePix is not yet distributed through the Google Play Store, Android's Play Protect may show an **"Unsafe app blocked"** or similar warning when installing the APK.
-> **Note:** Just tap **More details** -> **Install anyway** to proceed. RoutePix is completely safe and open-source!
-
-### 2. Creating Your Telegram Bot (Admin Only)
-To create a trip, you need your own Telegram Bot. It takes 2 minutes:
-1. Open Telegram and search for **[@BotFather](https://t.me/BotFather)**.
-2. Send the command `/newbot` and follow the prompts to give it a name and username.
-3. BotFather will give you a **Bot Token** (e.g., `123456:ABC-DEF1234...`). Copy this.
-4. Next, search for **[@userinfobot](https://t.me/userinfobot)** in Telegram and send it a message. It will reply with your **Chat ID** (a number like `123456789`). Copy this too.
-
-### 3. App Setup
-1. Launch RoutePix and Sign In with Google.
-2. Go to the **Settings** page (top right corner profile icon).
-3. Paste your **Telegram Bot Token** and **Chat ID** from the steps above, and click **Save**.
-4. You are now ready to create trips and invite friends!
+| Layer | Technology | Why This Choice |
+|-------|------------|-----------------|
+| **UI** | Jetpack Compose + Material 3 | Declarative, reactive, single-activity architecture |
+| **Architecture** | MVVM + `StateFlow` | Unidirectional data flow, lifecycle-aware |
+| **Auth** | Firebase Auth + Google Sign-In | Zero-friction onboarding |
+| **Remote DB** | Cloud Firestore | Real-time sync, security rules per trip |
+| **Local DB** | Room (upload queue) | Persistent queue survives process death |
+| **Background** | WorkManager | Guaranteed execution, battery-optimized |
+| **Network** | Retrofit + OkHttp → Telegram Bot API | Type-safe HTTP, multipart file uploads |
+| **Image Loading** | Coil with custom `ImageLoader` | CDN caching, memory/disk strategies, shimmer |
+| **Security** | AndroidX Security-Crypto + AES-256-GCM | Encrypted credentials at rest and in transit |
+| **Distribution** | GitHub Releases + in-app UpdateChecker | Independent of Play Store approval cycles |
 
 ---
 
-## 🛠 Tech Stack
+## 📦 Release History — 12+ Versioned Releases
 
-| Layer | Technology |
-|-------|-----------|
-| **UI** | Jetpack Compose, Material 3, Coil |
-| **Architecture** | MVVM with reactive `StateFlow` |
-| **Auth** | Firebase Auth + Google Sign-In |
-| **Database** | Cloud Firestore (remote), Room (local queue) |
-| **Background** | WorkManager for persistent chunked uploads |
-| **Network** | Retrofit & OkHttp (Telegram Bot API) |
-| **Security** | AndroidX Security-Crypto |
-
----
-
-## 📦 Release History (Since 1.1.0)
-
-- **v2.0.2** - **Premium Coil Image Engine.** Implemented custom Coil `ImageLoader` with aggressive Telegram CDN caching, 25% memory pool, and intelligent background prefetching. Lazy lists now use stable keys to eliminate jitter, providing a buttery-smooth scrolling experience.
-- **v2.0.1** - **UX & Stability Polish.** Added immediate visual feedback (loading overlay) after photo selection to eliminate the "nothing happens" gap. Updated download filename convention to `RoutePix_<timestamp>.jpg`. Fixed a critical `SecurityException` crash by adding the `DOWNLOAD_WITHOUT_NOTIFICATION` permission.
-- **v2.0.0** - **Dual-Format Upload Engine.** Every photo is now uploaded as both a compressed thumbnail (`sendPhoto`) and a full-quality document (`sendDocument`). Downloads always retrieve the original-quality version. Files under 50MB are preserved untouched — including Motion Photos. Removed misleading file size display from detailed view.
-- **v1.2.1** - Added automatic app update notifications via the GitHub Releases API. Users are notified when a new version is available with a direct download link.
-- **v1.2.0** - UX Overhaul: global multi-selection for all users, horizontal swipe between photos, vertical swipe-to-dismiss, crossfade album transitions, predictive back gesture support, admin-only trip editing, and hardened Firestore security rules.
-- **v1.1.8** - Implemented a dynamic native Pinch-to-Zoom Gallery Grid, Admin Multiple Photo Bulk Delete, file size display in Detailed view, and a Zero-Bandwidth Cross-Tag Duplication feature for copying photos to new tags.
-- **v1.1.7** - Added Admin-Only Tag Renaming across whole albums. Completely redesigned and uncluttered the full-screen photo viewer.
-- **v1.1.6** - Integrated the built-in Smart Image Compression Engine to resolve Telegram API HTTP 400 errors for files exceeding 10MB.
-- **v1.1.5** - Improved background resource management, temp-file lifecycle, and established logic bypasses for oversized Motion Photos.
-- **v1.1.4** - Created a dedicated "Upload Queue" view so users can track pending or failed background uploads.
-- **v1.1.3** - Shipped completely new Timeline sorting modes: Group `By Uploader`, `By Tag`, and `By Date`.
-- **v1.1.2** - Added customizable input functionality to the Tag Upload Bottom Sheet UI.
-- **v1.1.1** - Crucial hotfixes resolving Jetpack Compose NaN scaling crashes and Retrofit network memory leaks.
+| Version | Highlight |
+|---------|-----------|
+| **v2.0.2** | Premium Coil Image Engine — custom `ImageLoader` with 25% memory pool, CDN caching, and lazy-list stable keys for buttery-smooth scrolling |
+| **v2.0.1** | UX polish — immediate loading overlay after photo selection, download filename convention, `DOWNLOAD_WITHOUT_NOTIFICATION` permission fix |
+| **v2.0.0** | **Dual-Format Upload Engine** — every photo uploaded as both compressed thumbnail (`sendPhoto`) and byte-perfect original (`sendDocument`). Motion Photo support. |
+| **v1.2.1** | Auto-update notifications via GitHub Releases API |
+| **v1.2.0** | UX overhaul — global multi-selection, horizontal swipe, vertical swipe-to-dismiss, crossfade transitions, predictive back gesture, hardened Firestore rules |
+| **v1.1.8** | Dynamic pinch-to-zoom gallery grid, admin bulk delete, zero-bandwidth cross-tag duplication |
+| **v1.1.7** | Admin-only tag renaming, redesigned full-screen viewer |
+| **v1.1.6** | Smart image compression engine for Telegram's 10 MB `sendPhoto` limit |
+| **v1.1.5** | Background resource management, temp-file lifecycle, Motion Photo edge cases |
+| **v1.1.4** | Dedicated upload queue view with pending/failed status tracking |
+| **v1.1.3** | Timeline sorting: by Uploader, by Tag, by Date |
+| **v1.1.2** | Custom tag input in upload bottom sheet |
+| **v1.1.1** | Jetpack Compose NaN scaling crash fix, Retrofit memory leak fix |
 
 ---
 
-## 🎧 Support & Contact
+## 🚀 Getting Started
 
-Need help, have feature requests, or found a bug? 
-Feel free to reach out via email: **[sksalapur@gmail.com](mailto:sksalapur@gmail.com)**
+### Prerequisites
+- Android Studio Ladybug+ with Kotlin 2.0
+- A Firebase project with Auth + Firestore enabled
+- A Telegram Bot (created via [@BotFather](https://t.me/BotFather))
+
+### Setup
+1. Clone the repo and open in Android Studio
+2. Place your `google-services.json` in `app/`
+3. Build and run — sign in with Google
+4. Go to **Settings** → paste your Telegram Bot Token and Chat ID
+5. Create a trip and start uploading!
+
+> **Note:** Since RoutePix is distributed via GitHub Releases (not Play Store), Android may show a Play Protect warning. Tap **More details → Install anyway** to proceed.
 
 ---
 
-## 📄 License
+## 📐 Project Structure
 
-This project is open source under the [MIT License](LICENSE).
+```
+RoutePix/
+├── app/src/main/java/com/routepix/
+│   ├── data/
+│   │   ├── local/          # Room DB — QueuedPhoto, DAO, Database
+│   │   ├── model/          # PhotoMeta, Trip, User data classes
+│   │   ├── remote/         # Retrofit client, TelegramApi interface
+│   │   └── repository/     # TripRepository, UserRepository
+│   ├── security/           # AES-256-GCM SecurityManager
+│   ├── worker/             # PhotoUploadWorker (WorkManager)
+│   ├── ui/
+│   │   ├── auth/           # Google Sign-In screen + ViewModel
+│   │   ├── create/         # Create Trip flow
+│   │   ├── join/           # Join Trip via invite code
+│   │   ├── home/           # Trip dashboard, saved photos
+│   │   ├── timeline/       # Photo grid, TelegramAsyncImage, viewer
+│   │   ├── settings/       # Bot token configuration
+│   │   ├── components/     # Glass morphism components, loader
+│   │   └── theme/          # Material 3 color/theme
+│   ├── util/               # Download manager, EXIF, notifications, update checker
+│   └── navigation/         # Compose Navigation routes
+└── build.gradle.kts
+```
 
 ---
 
-*Made with ❤️ by the RoutePix Team.*
+<p align="center">
+  <strong>No cloud bill. No compression. No limits.</strong><br/>
+  <em>Just Telegram, a bot, and your memories — forever.</em>
+</p>
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/sksalapur">Sharanbasav Salapur</a>
+</p>
