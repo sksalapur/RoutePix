@@ -194,5 +194,5 @@ RoutePix/
 </p>
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/sksalapur">Sharanbasav Salapur</a>
+  Made with ❤️ by <a href="https://github.com/sksalapur">Shashank Salapur</a>
 </p>
