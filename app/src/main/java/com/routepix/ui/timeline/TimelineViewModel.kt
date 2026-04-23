@@ -240,11 +240,9 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
 
     fun downloadPhoto(context: android.content.Context, photo: PhotoMeta, albumName: String? = null) {
         viewModelScope.launch {
-            val user = com.routepix.data.repository.UserRepository(
-                FirebaseFirestore.getInstance(), 
-                com.google.firebase.auth.FirebaseAuth.getInstance()
-            ).getCurrentUser()
-            val useGallery = user?.showDownloadedPhotosInGallery ?: false
+            // Read preference from SharedPreferences (instant local read, no network round-trip)
+            val useGallery = context.getSharedPreferences("routepix_prefs", android.content.Context.MODE_PRIVATE)
+                .getBoolean("show_in_gallery", false)
             
             val url = resolveDocumentUrl(photo).firstOrNull()
             if (url != null) {
@@ -274,12 +272,9 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             launch(kotlinx.coroutines.Dispatchers.Main) {
                 android.widget.Toast.makeText(context, "Download in progress...", android.widget.Toast.LENGTH_SHORT).show()
             }
-            
-            val user = com.routepix.data.repository.UserRepository(
-                FirebaseFirestore.getInstance(), 
-                com.google.firebase.auth.FirebaseAuth.getInstance()
-            ).getCurrentUser()
-            val useGallery = user?.showDownloadedPhotosInGallery ?: false
+            // Read preference from SharedPreferences (instant local read, no network round-trip)
+            val useGallery = context.getSharedPreferences("routepix_prefs", android.content.Context.MODE_PRIVATE)
+                .getBoolean("show_in_gallery", false)
             
             val deferredDownloads = photos.map { photo ->
                 async(Dispatchers.IO) {

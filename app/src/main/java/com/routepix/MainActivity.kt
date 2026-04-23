@@ -19,6 +19,10 @@ import androidx.navigation.navArgument
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.Manifest
 import android.os.Build
 import com.routepix.navigation.Routes
@@ -90,6 +94,12 @@ fun RoutepixNavHost(
 ) {
     val navController = rememberNavController()
 
+    // Mutable so we can clear after first use — prevents the LaunchedEffect looping on back-press
+    val pendingCodeState = remember { mutableStateOf(deepLinkCode) }
+    val pendingNameState = remember { mutableStateOf(deepLinkName) }
+    var pendingCode by pendingCodeState
+    var pendingName by pendingNameState
+
     val context = LocalContext.current
     val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_IMAGES
@@ -158,10 +168,15 @@ fun RoutepixNavHost(
         }
 
         composable(Routes.TripHome.route) {
-            // If a deep link was received, navigate to JoinTrip after landing on TripHome
-            LaunchedEffect(deepLinkCode) {
-                if (deepLinkCode.isNotBlank()) {
-                    navController.navigate(Routes.JoinTrip.createRoute(deepLinkCode, deepLinkName))
+            // If a deep link was received, navigate to JoinTrip after landing on TripHome.
+            // pendingCode is cleared immediately after navigating so back-press doesn't re-trigger.
+            LaunchedEffect(pendingCode) {
+                if (pendingCode.isNotBlank()) {
+                    val code = pendingCode
+                    val name = pendingName
+                    pendingCode = ""
+                    pendingName = ""
+                    navController.navigate(Routes.JoinTrip.createRoute(code, name))
                 }
             }
 

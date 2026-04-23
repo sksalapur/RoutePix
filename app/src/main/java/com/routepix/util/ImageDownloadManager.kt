@@ -138,11 +138,24 @@ object ImageDownloadManager {
 
     /**
      * Syncs all private saved photos to the public gallery using MediaStore.
+     * Walks both root saved/ files (legacy) and tag subdirectories (current format).
      */
     suspend fun syncSavedPhotosToGallery(context: Context) = withContext(Dispatchers.IO) {
         val savedDir = File(context.filesDir, "saved")
         if (!savedDir.exists()) return@withContext
-        val files = savedDir.listFiles()?.filter { it.isFile && it.name.endsWith(".jpg") } ?: return@withContext
+
+        // Collect all jpg files: both flat (legacy) and inside tag subdirs
+        val files = mutableListOf<File>()
+        savedDir.listFiles()?.forEach { child ->
+            if (child.isFile && child.name.endsWith(".jpg")) {
+                files.add(child)
+            } else if (child.isDirectory) {
+                child.listFiles()
+                    ?.filter { it.isFile && it.name.endsWith(".jpg") }
+                    ?.forEach { files.add(it) }
+            }
+        }
+        if (files.isEmpty()) return@withContext
 
         val resolver = context.contentResolver
         val collection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {

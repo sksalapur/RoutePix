@@ -238,28 +238,48 @@ fun SettingsScreen(
                 }
 
                 if (showSyncDialog) {
+                    var isSyncing by remember { mutableStateOf(false) }
                     AlertDialog(
-                        onDismissRequest = { showSyncDialog = false },
+                        onDismissRequest = { if (!isSyncing) showSyncDialog = false },
                         title = { Text("Show in Gallery") },
-                        text = { Text("Also show already saved photos in the gallery?") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                showInGallery = true
-                                viewModel.updateGalleryPreference(true)
-                                scope.launch {
-                                    com.routepix.util.ImageDownloadManager.syncSavedPhotosToGallery(context)
+                        text = {
+                            if (isSyncing) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Text("Syncing photos to gallery…")
                                 }
-                                showSyncDialog = false
-                            }) {
+                            } else {
+                                Text("Also show already saved photos in the gallery?")
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showInGallery = true
+                                    viewModel.updateGalleryPreference(true)
+                                    isSyncing = true
+                                    scope.launch {
+                                        com.routepix.util.ImageDownloadManager.syncSavedPhotosToGallery(context)
+                                        isSyncing = false
+                                        showSyncDialog = false
+                                        android.widget.Toast.makeText(context, "Photos synced to gallery", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                enabled = !isSyncing
+                            ) {
                                 Text("Yes, sync all")
                             }
                         },
                         dismissButton = {
-                            TextButton(onClick = {
-                                showInGallery = true
-                                viewModel.updateGalleryPreference(true)
-                                showSyncDialog = false
-                            }) {
+                            TextButton(
+                                onClick = {
+                                    showInGallery = true
+                                    viewModel.updateGalleryPreference(true)
+                                    showSyncDialog = false
+                                },
+                                enabled = !isSyncing
+                            ) {
                                 Text("No, just going forward")
                             }
                         }

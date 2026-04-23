@@ -1,7 +1,10 @@
 package com.routepix.ui.settings
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import com.routepix.data.model.User
 import com.routepix.data.repository.UserRepository
 import com.routepix.data.repository.TripRepository
@@ -21,7 +24,9 @@ data class SettingsUiState(
     val error: String? = null
 )
 
-class SettingsViewModel : ViewModel() {
+class SettingsViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val app = application
 
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
@@ -77,6 +82,15 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun updateGalleryPreference(show: Boolean) {
+        // 1. Optimistically update local UI state immediately
+        val updatedUser = _uiState.value.user?.copy(showDownloadedPhotosInGallery = show)
+        if (updatedUser != null) {
+            _uiState.value = _uiState.value.copy(user = updatedUser)
+        }
+        // 2. Cache to SharedPreferences so downloadPhoto reads it instantly (no Firestore round-trip)
+        app.getSharedPreferences("routepix_prefs", android.content.Context.MODE_PRIVATE)
+            .edit().putBoolean("show_in_gallery", show).apply()
+        // 3. Persist to Firestore in background
         viewModelScope.launch {
             try {
                 userRepository.updateProfile(
@@ -85,7 +99,6 @@ class SettingsViewModel : ViewModel() {
                     chatId = _uiState.value.user?.telegramChatId ?: "",
                     showDownloadedPhotosInGallery = show
                 )
-                loadUser()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.localizedMessage)
             }
