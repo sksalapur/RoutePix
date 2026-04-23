@@ -81,56 +81,98 @@ fun JoinTripScreen(
         )
     }
 
+    // When arriving from a deep link, immediately check if already a member
+    LaunchedEffect(isDeepLink, inviteCode) {
+        if (isDeepLink && inviteCode.isNotBlank()) {
+            viewModel.checkMembershipByCode(inviteCode)
+        }
+    }
+
     LaunchedEffect(state) {
         val s = state
         if (s is JoinTripState.Success) {
             onTripJoined(s.tripId)
         }
+        // If already a member, keep showJoinDialog open so we render the AlreadyMember variant
     }
 
-    // Deep link confirmation popup — shown immediately on screen entry
+    // Deep link popup — shows immediately, branches on membership status
     if (showJoinDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showJoinDialog = false
-                onBack()
-            },
-            title = {
-                Text(
-                    text = if (decodedTripName.isNotBlank()) "Join \"$decodedTripName\"?" else "Join Trip?",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                if (state is JoinTripState.Loading) {
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+        when (val s = state) {
+            is JoinTripState.AlreadyMember -> {
+                AlertDialog(
+                    onDismissRequest = { onBack() },
+                    title = {
+                        Text(
+                            text = "Already a Member",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text("You're already a member of \"${s.tripName}\". Would you like to open the trip?")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { onTripJoined(s.tripId) }) {
+                            Text("Open Trip", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { onBack() }) {
+                            Text("Close")
+                        }
                     }
-                } else {
-                    Text("You've been invited to join this trip on RoutePix. Do you want to accept?")
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.joinTrip(inviteCode) },
-                    enabled = state !is JoinTripState.Loading
-                ) {
-                    Text("Join", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showJoinDialog = false
-                    onBack()
-                }) {
-                    Text("Cancel")
-                }
+                )
             }
-        )
+            is JoinTripState.Loading -> {
+                // Show a loading state while checking membership
+                AlertDialog(
+                    onDismissRequest = {},
+                    title = { Text("Checking…", style = MaterialTheme.typography.titleLarge) },
+                    text = {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    },
+                    confirmButton = {}
+                )
+            }
+            else -> {
+                // Idle / Error — show normal join confirmation
+                AlertDialog(
+                    onDismissRequest = {
+                        showJoinDialog = false
+                        onBack()
+                    },
+                    title = {
+                        Text(
+                            text = if (decodedTripName.isNotBlank()) "Join \"$decodedTripName\"?" else "Join Trip?",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text("You've been invited to join this trip on RoutePix. Do you want to accept?")
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { viewModel.joinTrip(inviteCode) },
+                            enabled = state !is JoinTripState.Loading
+                        ) {
+                            Text("Join", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showJoinDialog = false
+                            onBack()
+                        }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+        }
     }
 
 
