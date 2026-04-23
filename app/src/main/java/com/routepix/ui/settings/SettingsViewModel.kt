@@ -75,5 +75,21 @@ class SettingsViewModel : ViewModel() {
     fun signOut() {
         auth.signOut()
     }
+
+    fun updateGalleryPreference(show: Boolean) {
+        viewModelScope.launch {
+            try {
+                userRepository.updateProfile(
+                    displayName = _uiState.value.user?.displayName ?: "",
+                    botToken = _uiState.value.user?.telegramBotToken ?: "",
+                    chatId = _uiState.value.user?.telegramChatId ?: "",
+                    showDownloadedPhotosInGallery = show
+                )
+                loadUser()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+            }
+        }
+    }
 }
 

@@ -199,4 +199,36 @@ object ImageDownloadManager {
             }
         }
     }
+    /**
+     * Removes all RoutePix photos from the public gallery (MediaStore).
+     * Only removes the gallery copy — the private saved files remain intact.
+     */
+    suspend fun removeSavedPhotosFromGallery(context: Context) = withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        val collection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        } else {
+            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+
+        // Find all images in Pictures/RoutePix
+        val selection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            "${android.provider.MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+        } else {
+            "${android.provider.MediaStore.Images.Media.DATA} LIKE ?"
+        }
+        val selectionArgs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            arrayOf("Pictures/RoutePix%")
+        } else {
+            val externalDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+            arrayOf("${externalDir.absolutePath}/RoutePix%")
+        }
+
+        try {
+            val deleted = resolver.delete(collection, selection, selectionArgs)
+            android.util.Log.d("ImageDownloadManager", "Removed $deleted RoutePix photos from gallery")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }

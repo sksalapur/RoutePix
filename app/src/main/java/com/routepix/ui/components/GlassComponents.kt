@@ -24,6 +24,7 @@ fun GlassCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 16.dp,
     opacity: Float = 0.85f,
+    showBorder: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(cornerRadius)
@@ -32,10 +33,12 @@ fun GlassCard(
         modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = opacity))
-            .border(
-                width = 0.5.dp,
-                color = Color.White.copy(alpha = 0.15f), // Edge highlight
-                shape = shape
+            .then(
+                if (showBorder) Modifier.border(
+                    width = 0.5.dp,
+                    color = Color.White.copy(alpha = 0.15f),
+                    shape = shape
+                ) else Modifier
             )
     ) {
         Column(content = content)
@@ -63,7 +66,8 @@ fun GlassTopBar(
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
             cornerRadius = 0.dp, // Flat surface for bar
-            opacity = 0.95f
+            opacity = 0.95f,
+            showBorder = false // Prevent ghost lines in dark mode
         ) {
             TopAppBar(
                 title = title,

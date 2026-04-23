@@ -64,7 +64,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     private val _userNames = MutableStateFlow<Map<String, String>>(emptyMap())
     val userNames: StateFlow<Map<String, String>> = _userNames.asStateFlow()
 
-    private val _sortMode = MutableStateFlow<SortMode>(SortMode.ByTag)
+    private val _sortMode = MutableStateFlow<SortMode>(SortMode.ByUploader)
     val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
 
     /**

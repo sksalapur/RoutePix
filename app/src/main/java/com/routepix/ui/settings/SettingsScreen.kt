@@ -207,6 +207,9 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             SettingsCard(title = "App Preferences") {
+                var showSyncDialog by remember { mutableStateOf(false) }
+                var showRemoveDialog by remember { mutableStateOf(false) }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -224,8 +227,71 @@ fun SettingsScreen(
                     }
                     Switch(
                         checked = showInGallery,
-                        onCheckedChange = { showInGallery = it },
-                        enabled = isEditing
+                        onCheckedChange = { newValue ->
+                            if (newValue) {
+                                showSyncDialog = true
+                            } else {
+                                showRemoveDialog = true
+                            }
+                        }
+                    )
+                }
+
+                if (showSyncDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSyncDialog = false },
+                        title = { Text("Show in Gallery") },
+                        text = { Text("Also show already saved photos in the gallery?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showInGallery = true
+                                viewModel.updateGalleryPreference(true)
+                                scope.launch {
+                                    com.routepix.util.ImageDownloadManager.syncSavedPhotosToGallery(context)
+                                }
+                                showSyncDialog = false
+                            }) {
+                                Text("Yes, sync all")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                showInGallery = true
+                                viewModel.updateGalleryPreference(true)
+                                showSyncDialog = false
+                            }) {
+                                Text("No, just going forward")
+                            }
+                        }
+                    )
+                }
+
+                if (showRemoveDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showRemoveDialog = false },
+                        title = { Text("Hide from Gallery") },
+                        text = { Text("Also remove already saved photos from the gallery? (The photos will still be available in RoutePix's Saved section.)") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showInGallery = false
+                                viewModel.updateGalleryPreference(false)
+                                scope.launch {
+                                    com.routepix.util.ImageDownloadManager.removeSavedPhotosFromGallery(context)
+                                }
+                                showRemoveDialog = false
+                            }) {
+                                Text("Yes, remove from gallery")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                showInGallery = false
+                                viewModel.updateGalleryPreference(false)
+                                showRemoveDialog = false
+                            }) {
+                                Text("No, just going forward")
+                            }
+                        }
                     )
                 }
             }

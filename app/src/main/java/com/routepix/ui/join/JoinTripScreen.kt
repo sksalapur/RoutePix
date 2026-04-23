@@ -9,11 +9,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,18 +50,27 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.routepix.ui.components.GlassTopBar
 import com.routepix.ui.components.RoutepixLoader
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
 
 @Composable
 fun JoinTripScreen(
     onTripJoined: (tripId: String) -> Unit,
     onBack: () -> Unit,
-    viewModel: JoinTripViewModel = viewModel()
+    viewModel: JoinTripViewModel = viewModel(),
+    initialCode: String = "",
+    tripName: String = ""
 ) {
     val state by viewModel.state.collectAsState()
 
-    var inviteCode by rememberSaveable { mutableStateOf("") }
+    var inviteCode by rememberSaveable { mutableStateOf(initialCode.take(6).uppercase()) }
     val isFormValid = inviteCode.length == 6
     val errorMessage = (state as? JoinTripState.Error)?.message
+    val isDeepLink = initialCode.isNotBlank()
+    val decodedTripName = remember(tripName) {
+        try { java.net.URLDecoder.decode(tripName, "UTF-8") } catch (_: Exception) { tripName }
+    }
+    // Show the confirmation popup immediately when arriving from a deep link
+    var showJoinDialog by remember { mutableStateOf(isDeepLink) }
 
     // Screen Entry Animation
     val entryProgress = remember { Animatable(0f) }
@@ -73,6 +87,52 @@ fun JoinTripScreen(
             onTripJoined(s.tripId)
         }
     }
+
+    // Deep link confirmation popup — shown immediately on screen entry
+    if (showJoinDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showJoinDialog = false
+                onBack()
+            },
+            title = {
+                Text(
+                    text = if (decodedTripName.isNotBlank()) "Join \"$decodedTripName\"?" else "Join Trip?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                if (state is JoinTripState.Loading) {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Text("You've been invited to join this trip on RoutePix. Do you want to accept?")
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.joinTrip(inviteCode) },
+                    enabled = state !is JoinTripState.Loading
+                ) {
+                    Text("Join", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showJoinDialog = false
+                    onBack()
+                }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
 
     Scaffold(
         topBar = {
@@ -99,11 +159,38 @@ fun JoinTripScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = "Enter the 6-character invite code shared by the trip admin.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Deep link banner
+            if (isDeepLink && decodedTripName.isNotBlank()) {
+                androidx.compose.material3.Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "You've been invited!",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Join \"$decodedTripName\" Trip?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                Text(
+                    text = "Enter the 6-character invite code shared by the trip admin.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -158,10 +245,15 @@ fun JoinTripScreen(
                         speed = 1800
                     )
                 } else {
-                    Text("Join Trip", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isDeepLink) "Join Trip" else "Join Trip",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
     }
 }
+
 

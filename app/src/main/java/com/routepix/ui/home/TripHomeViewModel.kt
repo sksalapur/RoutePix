@@ -105,5 +105,110 @@ class TripHomeViewModel : ViewModel() {
     }
 
     fun getCurrentUid(): String = auth.currentUser?.uid ?: ""
-}
 
+    // ── Download Album ──
+
+    private val _downloadProgress = MutableStateFlow<Map<String, String>>(emptyMap()) // tripId -> "3/45"
+    val downloadProgress: StateFlow<Map<String, String>> = _downloadProgress.asStateFlow()
+
+    fun downloadTripAlbum(trip: Trip, context: android.content.Context) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Fetch all photos for this trip
+                val photosSnapshot = firestore.collection("trips")
+                    .document(trip.tripId)
+                    .collection("photos")
+                    .get()
+                    .await()
+
+                val photos = photosSnapshot.documents.mapNotNull {
+                    it.toObject(com.routepix.data.model.PhotoMeta::class.java)
+                }
+
+                if (photos.isEmpty()) {
+                    _downloadProgress.value = _downloadProgress.value - trip.tripId
+                    return@launch
+                }
+
+                // Get bot token for this trip
+                val tripDoc = firestore.collection("trips").document(trip.tripId).get().await()
+                val botToken = tripDoc.getString("botToken") ?: return@launch
+
+                val total = photos.size
+                var done = 0
+                _downloadProgress.value = _downloadProgress.value + (trip.tripId to "0/$total")
+
+                for (photo in photos) {
+                    val docId = photo.telegramDocumentId ?: continue
+                    val tag = photo.tag ?: "Untagged"
+                    val safeTripName = trip.name.replace(Regex("[^a-zA-Z0-9 _-]"), "").trim()
+                    val safeTag = tag.replace(Regex("[^a-zA-Z0-9 _-]"), "").trim()
+
+                    try {
+                        // Get file path from Telegram
+                        val fileResp = com.routepix.data.remote.RetrofitClient.telegramApi.getFile(botToken, docId)
+                        val filePath = fileResp.result?.filePath ?: continue
+                        val url = "https://api.telegram.org/file/bot$botToken/$filePath"
+
+                        // Download and save to gallery
+                        val filename = "${photo.photoId}.jpg"
+                        val resolver = context.contentResolver
+                        val collection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                            android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                        } else {
+                            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                        }
+
+                        val details = android.content.ContentValues().apply {
+                            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, filename)
+                            put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/RoutePix/$safeTripName/$safeTag")
+                                put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+                            }
+                        }
+
+                        // Check if already exists
+                        val existsSelection = "${android.provider.MediaStore.Images.Media.DISPLAY_NAME} = ?"
+                        val existsArgs = arrayOf(filename)
+                        var exists = false
+                        resolver.query(collection, arrayOf(android.provider.MediaStore.Images.Media._ID), existsSelection, existsArgs, null)?.use { cursor ->
+                            if (cursor.count > 0) exists = true
+                        }
+
+                        if (!exists) {
+                            val uri = resolver.insert(collection, details)
+                            if (uri != null) {
+                                val request = okhttp3.Request.Builder().url(url).build()
+                                val response = okhttp3.OkHttpClient().newCall(request).execute()
+                                if (response.isSuccessful) {
+                                    resolver.openOutputStream(uri)?.use { outStream ->
+                                        response.body?.byteStream()?.use { inStream ->
+                                            inStream.copyTo(outStream)
+                                        }
+                                    }
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                        details.clear()
+                                        details.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
+                                        resolver.update(uri, details, null, null)
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("TripHomeVM", "Failed to download ${photo.photoId}", e)
+                    }
+
+                    done++
+                    _downloadProgress.value = _downloadProgress.value + (trip.tripId to "$done/$total")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TripHomeVM", "downloadTripAlbum failed", e)
+            } finally {
+                // Clear progress after a brief delay so the user sees "done"
+                kotlinx.coroutines.delay(1500)
+                _downloadProgress.value = _downloadProgress.value - trip.tripId
+            }
+        }
+    }
+}

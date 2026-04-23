@@ -1,6 +1,7 @@
 package com.routepix
 
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -58,6 +59,10 @@ class MainActivity : ComponentActivity() {
             com.routepix.util.UpdateChecker.checkForUpdate(applicationContext)
         }
 
+        // Parse deep link from intent
+        val deepLinkCode = intent?.data?.getQueryParameter("code") ?: ""
+        val deepLinkName = intent?.data?.getQueryParameter("name") ?: ""
+
         setContent {
             RoutepixTheme {
                 // Root scaffold now ignores default insets to allow GlassTopBar to flow behind status bar
@@ -66,7 +71,11 @@ class MainActivity : ComponentActivity() {
                     contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
                 ) { innerPadding ->
                     // Content still respects horizontal padding if needed, but we handle vertical insets in screens
-                    RoutepixNavHost(modifier = Modifier.fillMaxSize())
+                    RoutepixNavHost(
+                        modifier = Modifier.fillMaxSize(),
+                        deepLinkCode = deepLinkCode,
+                        deepLinkName = deepLinkName
+                    )
                 }
             }
         }
@@ -74,7 +83,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun RoutepixNavHost(modifier: Modifier = Modifier) {
+fun RoutepixNavHost(
+    modifier: Modifier = Modifier,
+    deepLinkCode: String = "",
+    deepLinkName: String = ""
+) {
     val navController = rememberNavController()
 
     val context = LocalContext.current
@@ -145,9 +158,16 @@ fun RoutepixNavHost(modifier: Modifier = Modifier) {
         }
 
         composable(Routes.TripHome.route) {
+            // If a deep link was received, navigate to JoinTrip after landing on TripHome
+            LaunchedEffect(deepLinkCode) {
+                if (deepLinkCode.isNotBlank()) {
+                    navController.navigate(Routes.JoinTrip.createRoute(deepLinkCode, deepLinkName))
+                }
+            }
+
             TripHomeScreen(
                 onCreateTrip = { navController.navigate(Routes.CreateTrip.route) },
-                onJoinTrip = { navController.navigate(Routes.JoinTrip.route) },
+                onJoinTrip = { navController.navigate(Routes.JoinTrip.createRoute()) },
                 onSettingsClick = { navController.navigate(Routes.Settings.route) },
                 onTripClick = { trip ->
                     navController.navigate(Routes.Timeline.createRoute(trip.tripId))
@@ -188,14 +208,24 @@ fun RoutepixNavHost(modifier: Modifier = Modifier) {
             )
         }
 
-        composable(Routes.JoinTrip.route) {
+        composable(
+            route = Routes.JoinTrip.route,
+            arguments = listOf(
+                navArgument("code") { type = NavType.StringType; defaultValue = "" },
+                navArgument("name") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            val code = backStackEntry.arguments?.getString("code") ?: ""
+            val name = backStackEntry.arguments?.getString("name") ?: ""
             JoinTripScreen(
                 onTripJoined = { tripId ->
                     navController.navigate(Routes.Timeline.createRoute(tripId)) {
                         popUpTo(Routes.TripHome.route) { inclusive = false }
                     }
                 },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                initialCode = code,
+                tripName = name
             )
         }
 

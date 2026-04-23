@@ -42,6 +42,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep link: routepix://join?code=XXXXXX&name=TripName (direct scheme) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="routepix" android:host="join" />
+            </intent-filter>
+            <!-- App Link: https://sksalapur.github.io/RoutePix/join — intercepts the shareable HTTPS link -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="sksalapur.github.io"
+                    android:pathPrefix="/RoutePix/join" />
+            </intent-filter>
         </activity>
 
         <service

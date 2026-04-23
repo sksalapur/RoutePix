@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Join Trip — RoutePix</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a3d30;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px;
+      padding: 40px 32px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    .logo {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+    .app-name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 24px;
+      opacity: 0.9;
+    }
+    .trip-name {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+    .subtitle {
+      font-size: 15px;
+      opacity: 0.65;
+      margin-bottom: 32px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      margin-bottom: 12px;
+      transition: opacity 0.2s;
+    }
+    .btn:active { opacity: 0.8; }
+    .btn-primary {
+      background: #1db857;
+      color: #fff;
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .status {
+      font-size: 13px;
+      opacity: 0.5;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">📍</div>
+    <div class="app-name">RoutePix</div>
+    <div class="trip-name" id="trip-name">You've been invited!</div>
+    <div class="subtitle">Join this trip and share photos with your group</div>
+    <a class="btn btn-primary" id="open-app" href="#">Open in RoutePix</a>
+    <a class="btn btn-secondary" id="download-app"
+       href="https://github.com/sksalapur/RoutePix/releases/latest">
+      Download App
+    </a>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code') || '';
+    const name = params.get('name') || '';
+
+    // Show trip name if available
+    if (name) {
+      document.getElementById('trip-name').textContent = 'Join "' + decodeURIComponent(name) + '"?';
+    }
+
+    // Build the deep link
+    const deepLink = 'routepix://join?code=' + encodeURIComponent(code) + '&name=' + encodeURIComponent(name);
+
+    document.getElementById('open-app').href = deepLink;
+
+    document.getElementById('open-app').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('status').textContent = 'Opening RoutePix…';
+
+      // Try to open the app
+      window.location.href = deepLink;
+
+      // If app not installed, fall back to downloads page after 2s
+      setTimeout(function() {
+        document.getElementById('status').textContent = "App not installed. Redirecting to download…";
+        setTimeout(function() {
+          window.location.href = 'https://github.com/sksalapur/RoutePix/releases/latest';
+        }, 1500);
+      }, 2000);
+    });
+  </script>
+</body>
+</html>

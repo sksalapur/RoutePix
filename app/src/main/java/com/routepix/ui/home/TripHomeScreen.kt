@@ -235,13 +235,17 @@ fun TripHomeScreen(
             }
 
             items(uiState.trips, key = { it.tripId }) { trip ->
+                val downloadProgressMap by tripHomeViewModel.downloadProgress.collectAsState()
+                val context = LocalContext.current
                 TripListItem(
                     trip = trip,
                     currentUid = tripHomeViewModel.getCurrentUid() ?: "",
                     onClick = { onTripClick(trip) },
                     onEditClick = { tripToRename = trip },
                     onMembersClick = { tripToShowMembers = trip },
-                    onExitClick = { tripToExit = trip }
+                    onExitClick = { tripToExit = trip },
+                    onDownloadClick = { tripHomeViewModel.downloadTripAlbum(trip, context) },
+                    downloadProgress = downloadProgressMap[trip.tripId]
                 )
             }
 
@@ -403,12 +407,15 @@ private fun TripListItem(
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onMembersClick: () -> Unit,
-    onExitClick: () -> Unit
+    onExitClick: () -> Unit,
+    onDownloadClick: () -> Unit = {},
+    downloadProgress: String? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(targetValue = if (isPressed) 0.96f else 1f, label = "card_scale")
     val context = LocalContext.current
+    var showDownloadConfirm by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -429,61 +436,110 @@ private fun TripListItem(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // Trip name — full width, up to 2 lines
+            Text(
+                text = trip.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Meta info + action icons row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = trip.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                
-                Row {
+                // Left: code + members
+                Column {
+                    Text(
+                        text = "Code: ${trip.inviteCode}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${trip.memberUids.size} members",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Right: action icons
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Share
                     IconButton(onClick = {
-                        val shareText = "Hey! Join the trip ${trip.name} on RoutePix!\n\nDownload the app: https://github.com/sksalapur/RoutePix/releases/latest\n\nInvite code: ${trip.inviteCode}"
+                        val encodedName = java.net.URLEncoder.encode(trip.name, "UTF-8")
+                        // HTTPS link — clickable in all messaging apps.
+                        // Opens the app if installed, else shows a web page that falls back to releases.
+                        val joinLink = "https://sksalapur.github.io/RoutePix/join?code=${trip.inviteCode}&name=$encodedName"
+                        val shareText = "Hey! Join me on \"${trip.name}\" trip on RoutePix!\n\n$joinLink"
                         val sendIntent = Intent().apply {
                             action = Intent.ACTION_SEND
                             putExtra(Intent.EXTRA_TEXT, shareText)
                             type = "text/plain"
                         }
-                        val shareIntent = Intent.createChooser(sendIntent, null)
-                        context.startActivity(shareIntent)
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary)
+                        context.startActivity(Intent.createChooser(sendIntent, null))
+                    }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     }
-                    if (trip.adminUid == currentUid) {
-                        IconButton(onClick = onEditClick) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+
+                    // Download album
+                    IconButton(onClick = { showDownloadConfirm = true }, modifier = Modifier.size(36.dp)) {
+                        if (downloadProgress != null) {
+                            Text(
+                                text = downloadProgress,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            Icon(Icons.Default.Download, contentDescription = "Download Album", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                     }
-                    IconButton(onClick = onMembersClick) {
-                        Icon(Icons.Default.Person, contentDescription = "Members", tint = MaterialTheme.colorScheme.primary)
+
+                    // Edit (admin only)
+                    if (trip.adminUid == currentUid) {
+                        IconButton(onClick = onEditClick, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        }
                     }
-                    IconButton(onClick = onExitClick) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Exit Trip", tint = MaterialTheme.colorScheme.error)
+
+                    // Members
+                    IconButton(onClick = onMembersClick, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Person, contentDescription = "Members", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+
+                    // Exit
+                    IconButton(onClick = onExitClick, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Exit Trip", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row {
-                Text(
-                    text = "Code: ${trip.inviteCode}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = "${trip.memberUids.size} members",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
+    }
+
+    if (showDownloadConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDownloadConfirm = false },
+            title = { Text("Download Album") },
+            text = { Text("Download all photos from \"${trip.name}\" to your gallery? Photos will be organized by their tags into folders.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDownloadConfirm = false
+                    onDownloadClick()
+                }) {
+                    Text("Download")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDownloadConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
