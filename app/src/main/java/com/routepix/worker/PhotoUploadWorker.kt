@@ -242,7 +242,9 @@ class PhotoUploadWorker(
                 Log.e(TAG, "No photo sizes in sendPhoto response")
                 return false
             }
-            val bestPhoto = photoSizes.maxByOrNull { it.width * it.height }!!
+            // Pick a medium size for the grid (closest to 320px width)
+            // Telegram usually generates sizes like 90, 320, 800, 1280.
+            val bestPhoto = photoSizes.minByOrNull { kotlin.math.abs(it.width - 320) } ?: photoSizes.first()
             photoFileId = bestPhoto.fileId
             photoFileSize = bestPhoto.fileSize
         } finally {

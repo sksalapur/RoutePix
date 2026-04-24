@@ -23,12 +23,15 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -110,6 +113,8 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.core.animateFloat
 import com.routepix.ui.components.FullScreenLoaderOverlay
 import com.routepix.ui.components.GlassBottomSheetContent
 import com.routepix.ui.components.GlassTopBar
@@ -298,12 +303,7 @@ fun TimelineScreen(
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
     val isAdmin = activeTrip?.adminUid == auth.currentUser?.uid
 
-    LaunchedEffect(grouped) {
-        val allPhotos = grouped.values.flatten()
-        if (allPhotos.isNotEmpty()) {
-            timelineViewModel.prefetchThumbnails(context, allPhotos)
-        }
-    }
+
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -586,81 +586,141 @@ fun TimelineScreen(
                             if (viewMode == ViewMode.GRID) {
                                 var gridColumns by remember { mutableStateOf(3) }
                                 var scale by remember { mutableStateOf(1f) }
+                                val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                                val totalItems = albumPhotos.size
+                                val coroutineScope = rememberCoroutineScope()
 
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(gridColumns),
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .pointerInput(Unit) {
-                                            detectTransformGestures { _, _, zoom, _ ->
-                                                scale *= zoom
-                                                if (scale > 1.3f && gridColumns > 2) {
-                                                    gridColumns--
-                                                    scale = 1f
-                                                } else if (scale < 0.7f && gridColumns < 6) {
-                                                    gridColumns++
-                                                    scale = 1f
-                                                }
-                                            }
-                                        },
-                                    contentPadding = PaddingValues(
-                                        top = padding.calculateTopPadding() + 16.dp,
-                                        bottom = padding.calculateBottomPadding() + 80.dp,
-                                        start = 4.dp,
-                                        end = 4.dp
-                                    ),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    items(albumPhotos, key = { it.photoId }) { photo ->
-                                        val isSelected = photo.photoId in selectedPhotoIds
-                                        val interactionSource = remember { MutableInteractionSource() }
-                                        val isPressed by interactionSource.collectIsPressedAsState()
-                                        val itemScale by animateFloatAsState(
-                                            targetValue = if (isPressed) 0.94f else 1f,
-                                            label = "grid_scale"
-                                        )
+                                // Auto-hide thumb after 1.5s of no scrolling
+                                var thumbVisible by remember { mutableStateOf(false) }
+                                LaunchedEffect(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) {
+                                    thumbVisible = true
+                                    kotlinx.coroutines.delay(1500)
+                                    thumbVisible = false
+                                }
 
-                                        Box(
-                                            modifier = Modifier
-                                                .aspectRatio(1f)
-                                                .graphicsLayer {
-                                                    scaleX = itemScale
-                                                    scaleY = itemScale
-                                                }
-                                                .combinedClickable(
-                                                    interactionSource = interactionSource,
-                                                    indication = androidx.compose.foundation.LocalIndication.current,
-                                                    onClick = {
-                                                        if (selectedPhotoIds.isNotEmpty()) timelineViewModel.toggleSelection(photo.photoId)
-                                                        else {
-                                                            selectedPhotoIndex = albumPhotos.indexOf(photo)
-                                                        }
-                                                    },
-                                                    onLongClick = {
-                                                        timelineViewModel.toggleSelection(photo.photoId)
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    LazyVerticalGrid(
+                                        state = gridState,
+                                        columns = GridCells.Fixed(gridColumns),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .pointerInput(Unit) {
+                                                detectTransformGestures { _, _, zoom, _ ->
+                                                    scale *= zoom
+                                                    if (scale > 1.3f && gridColumns > 2) {
+                                                        gridColumns--
+                                                        scale = 1f
+                                                    } else if (scale < 0.7f && gridColumns < 6) {
+                                                        gridColumns++
+                                                        scale = 1f
                                                     }
-                                                )
-                                        ) {
-                                            TimelineMediaItem(
-                                                photo = photo,
-                                                timelineViewModel = timelineViewModel,
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
+                                                }
+                                            },
+                                        contentPadding = PaddingValues(
+                                            top = padding.calculateTopPadding() + 16.dp,
+                                            bottom = padding.calculateBottomPadding() + 80.dp,
+                                            start = 4.dp,
+                                            end = 20.dp // leave room for the thumb
+                                        ),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        items(albumPhotos, key = { it.photoId }) { photo ->
+                                            val isSelected = photo.photoId in selectedPhotoIds
+                                            val interactionSource = remember { MutableInteractionSource() }
+                                            val isPressed by interactionSource.collectIsPressedAsState()
+                                            val itemScale by animateFloatAsState(
+                                                targetValue = if (isPressed) 0.94f else 1f,
+                                                label = "grid_scale"
                                             )
-                                            if (isSelected) {
-                                                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.4f)))
-                                                Icon(
-                                                    Icons.Default.CheckCircle,
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .aspectRatio(1f)
+                                                    .graphicsLayer {
+                                                        scaleX = itemScale
+                                                        scaleY = itemScale
+                                                    }
+                                                    .combinedClickable(
+                                                        interactionSource = interactionSource,
+                                                        indication = androidx.compose.foundation.LocalIndication.current,
+                                                        onClick = {
+                                                            if (selectedPhotoIds.isNotEmpty()) timelineViewModel.toggleSelection(photo.photoId)
+                                                            else {
+                                                                selectedPhotoIndex = albumPhotos.indexOf(photo)
+                                                            }
+                                                        },
+                                                        onLongClick = {
+                                                            timelineViewModel.toggleSelection(photo.photoId)
+                                                        }
+                                                    )
+                                            ) {
+                                                TimelineMediaItem(
+                                                    photo = photo,
+                                                    timelineViewModel = timelineViewModel,
                                                     contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
                                                 )
+                                                if (isSelected) {
+                                                    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.4f)))
+                                                    Icon(
+                                                        Icons.Default.CheckCircle,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
+
+                                    // ── Fast-scroll thumb scrubber ──────────────────────
+                                    androidx.compose.animation.AnimatedVisibility(
+                                        visible = thumbVisible,
+                                        modifier = Modifier.align(Alignment.CenterEnd),
+                                        enter = androidx.compose.animation.fadeIn(tween(150)),
+                                        exit = androidx.compose.animation.fadeOut(tween(600))
+                                    ) {
+                                        val density = androidx.compose.ui.platform.LocalDensity.current
+                                        val trackHeightPx = remember { mutableStateOf(0f) }
+                                        val thumbFraction = remember(gridState.firstVisibleItemIndex, totalItems) {
+                                            if (totalItems <= 1) 0f
+                                            else (gridState.firstVisibleItemIndex.toFloat() / (totalItems - 1)).coerceIn(0f, 1f)
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .width(28.dp)
+                                                .fillMaxHeight()
+                                                .onGloballyPositioned { trackHeightPx.value = it.size.height.toFloat() }
+                                                .pointerInput(totalItems) {
+                                                    detectDragGestures(
+                                                        onDragStart = { thumbVisible = true }
+                                                    ) { change, _ ->
+                                                        change.consume()
+                                                        val fraction = (change.position.y / trackHeightPx.value).coerceIn(0f, 1f)
+                                                        val targetIndex = (fraction * (totalItems - 1)).toInt()
+                                                        coroutineScope.launch {
+                                                            gridState.scrollToItem(targetIndex)
+                                                        }
+                                                        thumbVisible = true
+                                                    }
+                                                }
+                                        ) {
+                                            // Thumb pill
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(5.dp)
+                                                    .height(40.dp)
+                                                    .align(Alignment.TopCenter)
+                                                    .offset(y = with(density) { (trackHeightPx.value * thumbFraction - 20.dp.toPx()).toDp() })
+                                                    .clip(RoundedCornerShape(50))
+                                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
+                                            )
+                                        }
+                                    }
+                                } // end Box (grid + thumb)
                             } else {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
@@ -1074,6 +1134,37 @@ private fun SortModeSelector(
 
 @Composable
 private fun SectionHeader(title: String) {
+    if (title == "<SHIMMER>") {
+        val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "shimmer")
+        val shimmerOffset by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1000f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = androidx.compose.animation.core.tween(durationMillis = 1200),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+            ),
+            label = "shimmer_offset"
+        )
+        val shimmerBrush = Brush.linearGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.surfaceVariant,
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.surfaceVariant
+            ),
+            start = Offset(shimmerOffset - 200f, 0f),
+            end = Offset(shimmerOffset, 0f)
+        )
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .height(28.dp)
+                .width(120.dp)
+                .clip(RoundedCornerShape(50))
+                .background(shimmerBrush)
+        )
+        return
+    }
+
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.primaryContainer,
@@ -1327,10 +1418,24 @@ private fun TimelineMediaItem(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit
 ) {
-    val url by timelineViewModel.resolveImageUrl(photo).collectAsState(initial = null)
+    // Observe the pre-resolved URL map. When the ViewModel finishes resolving in the background,
+    // this recomposition will fire and the image will snap in — no coroutines in Compose.
+    val resolvedUrls by timelineViewModel.resolvedImageUrls.collectAsState()
+    val url = resolvedUrls[photo.telegramFileId]
+    val context = LocalContext.current
+    
+    val imageRequest = remember(url) {
+        coil.request.ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(250)
+            .memoryCacheKey(photo.telegramFileId)
+            .diskCacheKey(photo.telegramFileId)
+            .build()
+    }
+
     Box(modifier = modifier) {
         AsyncImage(
-            model = url,
+            model = imageRequest,
             contentDescription = contentDescription,
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
             contentScale = contentScale,

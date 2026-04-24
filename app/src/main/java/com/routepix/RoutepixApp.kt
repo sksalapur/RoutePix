@@ -11,6 +11,13 @@ import okhttp3.Response
 
 class RoutepixApp : Application(), ImageLoaderFactory {
 
+    override fun onCreate() {
+        super.onCreate()
+        // Initialise disk-backed thumbnail cache as early as possible so
+        // TripHomeViewModel can warm from disk before triggering any network calls.
+        com.routepix.data.cache.ThumbnailCache.init(this)
+    }
+
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             // Memory cache: 25% of app memory
@@ -19,39 +26,36 @@ class RoutepixApp : Application(), ImageLoaderFactory {
                     .maxSizePercent(0.25)
                     .build()
             }
-            // Disk cache: 250 MB at context.cacheDir/image_cache
+            // Disk cache: 1 GB
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(250L * 1024 * 1024) // 250 MB
+                    .maxSizeBytes(1024L * 1024 * 1024) // 1 GB
                     .build()
             }
             .okHttpClient {
                 OkHttpClient.Builder()
-                    .addInterceptor(TelegramCacheInterceptor())
-                    // Optionally add other okhttp configs if needed here
+                    .addNetworkInterceptor(TelegramCacheInterceptor())
                     .build()
             }
             .crossfade(200)
             .build()
     }
 
+    // Adds long-lived Cache-Control headers to Telegram CDN responses so Coil
+    // stores them on disk and never re-downloads the same image bytes.
     private class TelegramCacheInterceptor : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
-            val urlString = request.url.toString()
-            
-            val originalResponse = chain.proceed(request)
-            
-            // Override Telegram CDN headers
-            if (urlString.contains("api.telegram.org/file")) {
-                return originalResponse.newBuilder()
-                    .header("Cache-Control", "public, max-age=86400")
-                    .removeHeader("Pragma") // Remove Pragma to ensure Cache-Control works
+            val response = chain.proceed(chain.request())
+            return if (chain.request().url.host == "cdn4.telegram.org" ||
+                chain.request().url.toString().contains("api.telegram.org/file")) {
+                response.newBuilder()
+                    .header("Cache-Control", "public, max-age=604800") // 7 days
+                    .removeHeader("Pragma")
                     .build()
+            } else {
+                response
             }
-            
-            return originalResponse
         }
     }
 }

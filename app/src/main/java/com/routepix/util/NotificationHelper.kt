@@ -28,8 +28,8 @@ object NotificationHelper {
         }
     }
 
-    fun getForegroundInfo(context: Context, progress: Int, total: Int): ForegroundInfo {
-        val notification = createNotification(context, progress, total)
+    fun getForegroundInfo(context: Context, progress: Int, total: Int, customTitle: String? = null, customContent: String? = null): ForegroundInfo {
+        val notification = createNotification(context, progress, total, customTitle, customContent)
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ForegroundInfo(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
@@ -37,9 +37,9 @@ object NotificationHelper {
         }
     }
 
-    fun createNotification(context: Context, progress: Int, total: Int): Notification {
-        val title = "Uploading Photos"
-        val content = if (total > 0) "$progress of $total completed" else "Preparing upload..."
+    fun createNotification(context: Context, progress: Int, total: Int, customTitle: String? = null, customContent: String? = null): Notification {
+        val title = customTitle ?: "Uploading Photos"
+        val content = customContent ?: if (total > 0) "$progress of $total completed" else "Preparing upload..."
         
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(title)

@@ -122,8 +122,10 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             groupPhotos(photoList, mode)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    private val urlCache = ConcurrentHashMap<String, String>()
     private val fetchedUserIds = mutableSetOf<String>()
+
+    /** Expose the global cache so UI composables can observe it with a single StateFlow. */
+    val resolvedImageUrls = com.routepix.data.cache.ThumbnailCache.resolvedUrls
 
     init {
         loadTrip()
@@ -150,36 +152,20 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         _viewMode.value = mode
     }
 
-    fun resolveImageUrl(photo: PhotoMeta): Flow<String?> = activeTrip
-        .filterNotNull()
-        .flatMapLatest { trip ->
-            flow {
-                val fileId = photo.telegramFileId
-                urlCache[fileId]?.let {
-                    emit(it)
-                    return@flow
-                }
-                val adminUid = trip.adminUid
-                val token = getBotToken(adminUid)
-                if (token == null) {
-                    emit(null)
-                    return@flow
-                }
-                try {
-                    val response = RetrofitClient.telegramApi.getFile(token, fileId)
-                    val filePath = response.result?.filePath
-                    if (filePath != null) {
-                        val url = "https://api.telegram.org/file/bot$token/$filePath"
-                        urlCache[fileId] = url
-                        emit(url)
-                    } else {
-                        emit(null)
-                    }
-                } catch (_: Exception) {
-                    emit(null)
-                }
-            }
-        }
+    /**
+     * Instantly returns the pre-resolved CDN URL for a photo thumbnail from the global cache.
+     */
+    fun getResolvedImageUrl(photo: PhotoMeta): String? =
+        com.routepix.data.cache.ThumbnailCache.get(photo.telegramFileId)
+
+    /**
+     * Resolves URLs for any photos not already in the global cache.
+     * Delegates to ThumbnailCache which runs on its own IO scope.
+     */
+    private fun resolveAllImageUrls(photos: List<PhotoMeta>) {
+        val token = _activeTrip.value?.telegramBotToken ?: return
+        com.routepix.data.cache.ThumbnailCache.prefetchTrip(photos, token)
+    }
 
     /**
      * Resolve the high-quality download URL for a photo.
@@ -194,12 +180,12 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                     emit(null)
                     return@flow
                 }
-                urlCache[fileId]?.let {
+                // Check global cache first (handles the case where it was already resolved as a thumbnail)
+                com.routepix.data.cache.ThumbnailCache.get(fileId)?.let {
                     emit(it)
                     return@flow
                 }
-                val adminUid = trip.adminUid
-                val token = getBotToken(adminUid)
+                val token = trip.telegramBotToken
                 if (token == null) {
                     emit(null)
                     return@flow
@@ -209,7 +195,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                     val filePath = response.result?.filePath
                     if (filePath != null) {
                         val url = "https://api.telegram.org/file/bot$token/$filePath"
-                        urlCache[fileId] = url
+                        com.routepix.data.cache.ThumbnailCache.put(fileId, url, filePath)
                         emit(url)
                     } else {
                         emit(null)
@@ -219,24 +205,6 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                 }
             }
         }
-
-    fun prefetchThumbnails(context: android.content.Context, photos: List<PhotoMeta>) {
-        viewModelScope.launch {
-            val imageLoader = coil.Coil.imageLoader(context)
-            photos.take(10).forEach { photo ->
-                val url = resolveImageUrl(photo).firstOrNull()
-                if (url != null) {
-                    val request = coil.request.ImageRequest.Builder(context)
-                        .data(url)
-                        .size(coil.size.Size(256, 256))
-                        .memoryCacheKey(photo.telegramFileId)
-                        .diskCacheKey(photo.telegramFileId)
-                        .build()
-                    imageLoader.enqueue(request)
-                }
-            }
-        }
-    }
 
     fun downloadPhoto(context: android.content.Context, photo: PhotoMeta, albumName: String? = null) {
         viewModelScope.launch {
@@ -392,17 +360,24 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         viewModelScope.launch {
             try {
                 val doc = firestore.collection("trips").document(tripId).get().await()
-                _activeTrip.value = doc.toObject(Trip::class.java)
+                val trip = doc.toObject(Trip::class.java)
+                _activeTrip.value = trip
+                if (trip != null) {
+                    // Pre-fetch the bot token so the OkHttp Interceptor has it ready for Coil image loading
+                    getBotToken(trip.adminUid)
+                }
             } catch (_: Exception) {  }
         }
     }
 
     private fun observePhotos() {
         viewModelScope.launch {
+            // Wait for trip (and thus bot token) to be ready before processing photos
+            _activeTrip.filterNotNull().first()
             photosFlow().collect { photoList ->
                 _photos.value = photoList
                 resolveUserNames(photoList)
-                // Note: scanForMotionPhotos was removed due to excessive data usage when downloading full originals in the background.
+                resolveAllImageUrls(photoList)
             }
         }
     }
@@ -483,11 +458,18 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                 }
             }
             is SortMode.ByUploader -> {
+                val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
                 displayList.groupBy { photo ->
                     photo.uploaderUid
                 }.mapKeys { (uid, _) ->
                     val name = _userNames.value[uid]
-                    if (!name.isNullOrBlank()) name else uid
+                    if (!name.isNullOrBlank()) {
+                        if (uid == currentUid) "$name (You)" else name
+                    } else if (uid == currentUid) {
+                        "You"
+                    } else {
+                        "<SHIMMER>"
+                    }
                 }
             }
             is SortMode.ByTag -> {

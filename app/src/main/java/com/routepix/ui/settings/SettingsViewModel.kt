@@ -100,7 +100,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     showDownloadedPhotosInGallery = show
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                // Ignore background persistence failure
             }
         }
     }

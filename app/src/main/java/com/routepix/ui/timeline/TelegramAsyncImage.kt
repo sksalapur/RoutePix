@@ -32,25 +32,24 @@ import com.routepix.data.model.PhotoMeta
 @Composable
 fun TelegramAsyncImage(
     photo: PhotoMeta,
-    botToken: String, // Kept for backwards compatibility if needed, but using VM now
+    botToken: String, // Kept for backwards compatibility, not used
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     contentDescription: String? = "Trip photo",
     timelineViewModel: TimelineViewModel = viewModel()
 ) {
-    val resolvedUrl by remember(photo.telegramFileId) {
-        timelineViewModel.resolveImageUrl(photo)
-    }.collectAsState(initial = null)
+    // Read from the eagerly-resolved URL map. Zero coroutines, zero I/O on the UI thread.
+    val resolvedUrls by timelineViewModel.resolvedImageUrls.collectAsState()
+    val resolvedUrl = resolvedUrls[photo.telegramFileId]
 
     if (resolvedUrl == null) {
         ShimmerBox(modifier = modifier)
     } else {
         val context = androidx.compose.ui.platform.LocalContext.current
-        val imageRequest = remember(resolvedUrl, photo.telegramFileId) {
+        val imageRequest = remember(resolvedUrl) {
             coil.request.ImageRequest.Builder(context)
                 .data(resolvedUrl)
-                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                .crossfade(200)
                 .memoryCacheKey(photo.telegramFileId)
                 .diskCacheKey(photo.telegramFileId)
                 .build()
@@ -115,4 +114,3 @@ private fun ErrorPlaceholder(modifier: Modifier = Modifier) {
         )
     }
 }
-

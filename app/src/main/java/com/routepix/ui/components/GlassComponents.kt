@@ -46,7 +46,8 @@ fun GlassCard(
 }
 
 /**
- * GlassTopBar: Blurred top navigation bar that allows content scrolling behind it.
+ * GlassTopBar: Consistent top navigation bar with a thin bottom divider.
+ * Uses the exact surface color so it matches the background in both light and dark modes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,31 +58,25 @@ fun GlassTopBar(
     actions: @Composable RowScope.() -> Unit = {},
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets
 ) {
-    // TopAppBar inside a GlassCard that covers the status bar area
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
-        GlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 0.dp, // Flat surface for bar
-            opacity = 0.95f,
-            showBorder = false // Prevent ghost lines in dark mode
-        ) {
-            TopAppBar(
-                title = title,
-                navigationIcon = navigationIcon,
-                actions = actions,
-                windowInsets = windowInsets,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                )
+        TopAppBar(
+            title = title,
+            navigationIcon = navigationIcon,
+            actions = actions,
+            windowInsets = windowInsets,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                actionIconContentColor = MaterialTheme.colorScheme.onSurface
             )
-        }
+        )
     }
 }
 

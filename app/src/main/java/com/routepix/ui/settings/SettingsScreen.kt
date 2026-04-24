@@ -316,7 +316,7 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+
 
             if (isEditing) {
                 val interactionSource = remember { MutableInteractionSource() }

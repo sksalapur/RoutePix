@@ -14,8 +14,8 @@ android {
         applicationId = "com.routepix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "2.4.2"
+        versionCode = 22
+        versionName = "2.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -104,6 +104,9 @@ dependencies {
 
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Downloadable Fonts (Google Fonts API for Compose)
+    implementation("androidx.compose.ui:ui-text-google-fonts")
 
 
     // Testing

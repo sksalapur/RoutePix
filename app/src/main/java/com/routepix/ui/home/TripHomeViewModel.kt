@@ -48,6 +48,8 @@ class TripHomeViewModel : ViewModel() {
         }
     }
 
+    private var hasWarmedDisk = false
+
     private fun observeTrips() {
         viewModelScope.launch {
             repository.getTripsForCurrentUser()
@@ -62,6 +64,17 @@ class TripHomeViewModel : ViewModel() {
                         trips = trips,
                         isLoading = false
                     )
+                    if (!hasWarmedDisk) {
+                        hasWarmedDisk = true
+                        // Step 1: load persisted filePaths from disk → reconstructs URLs instantly,
+                        // zero network calls for photos we've already seen before.
+                        com.routepix.data.cache.ThumbnailCache.warmFromDisk(trips)
+                    }
+                    // Step 2: fetch only photos NOT already in the in-memory cache.
+                    // On a fresh install this resolves everything; on update/restart
+                    // warmFromDisk will have pre-populated known entries so only truly
+                    // new photos cause network calls — and isPrefetching stays false if none.
+                    com.routepix.data.cache.ThumbnailCache.prefetchAllTrips(trips)
                 }
         }
     }

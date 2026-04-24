@@ -78,6 +78,10 @@ fun TripHomeScreen(
     LaunchedEffect(Unit) {
         entryProgress.animateTo(1f, animationSpec = tween(600, easing = FastOutSlowInEasing))
     }
+    
+    val downloadProgressMap by tripHomeViewModel.downloadProgress.collectAsState()
+    val context = LocalContext.current
+    val isBuildingCache by com.routepix.data.cache.ThumbnailCache.isPrefetching.collectAsState()
 
     Scaffold(
         topBar = {
@@ -155,8 +159,36 @@ fun TripHomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(20.dp))
-                
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Banner: only shown during initial thumbnail prefetch after login
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isBuildingCache,
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = "Building thumbnail cache — images may load slowly until complete. This will take some time depending on the number of trips you have joined",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -167,15 +199,17 @@ fun TripHomeScreen(
                         onClick = onCreateTrip,
                         modifier = Modifier.weight(1f),
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        filled = true
                     )
                     ActionCard(
                         title = "Join Trip",
                         icon = Icons.Default.Share,
                         onClick = onJoinTrip,
                         modifier = Modifier.weight(1f),
-                        containerColor = MaterialTheme.colorScheme.secondary,
-                        contentColor = MaterialTheme.colorScheme.onSecondary
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        filled = false
                     )
                 }
             }
@@ -235,8 +269,6 @@ fun TripHomeScreen(
             }
 
             items(uiState.trips, key = { it.tripId }) { trip ->
-                val downloadProgressMap by tripHomeViewModel.downloadProgress.collectAsState()
-                val context = LocalContext.current
                 TripListItem(
                     trip = trip,
                     currentUid = tripHomeViewModel.getCurrentUid() ?: "",
@@ -363,7 +395,8 @@ private fun ActionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surface,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    filled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -376,11 +409,15 @@ private fun ActionCard(
             scaleX = scale
             scaleY = scale
         },
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = containerColor,
             contentColor = contentColor
-        )
+        ),
+        border = if (!filled) BorderStroke(
+            width = 1.5.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+        ) else null
     ) {
         Column(
             modifier = Modifier
@@ -389,12 +426,12 @@ private fun ActionCard(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(28.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

@@ -117,33 +117,57 @@ fun RoutepixNavHost(
         enterTransition = {
             androidx.compose.animation.slideInHorizontally(
                 initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             ) + androidx.compose.animation.fadeIn(
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             )
         },
         exitTransition = {
             androidx.compose.animation.slideOutHorizontally(
                 targetOffsetX = { fullWidth -> -fullWidth / 3 },
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             ) + androidx.compose.animation.fadeOut(
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             )
         },
         popEnterTransition = {
             androidx.compose.animation.slideInHorizontally(
                 initialOffsetX = { fullWidth -> -fullWidth / 3 },
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             ) + androidx.compose.animation.fadeIn(
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             )
         },
         popExitTransition = {
             androidx.compose.animation.slideOutHorizontally(
                 targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             ) + androidx.compose.animation.fadeOut(
-                animationSpec = androidx.compose.animation.core.tween(350)
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                )
             )
         }
     ) {
