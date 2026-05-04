@@ -13,10 +13,13 @@
 local.properties
 
 # Build outputs & logs (Cleanup)
-build_log.txt
-build_log_*.txt
-build_output.txt
-build_output_*.txt
+*.apk
+*.log
+crash*.txt
+full_log.txt
+out.txt
+build_log*.txt
+build_output*.txt
 final_build_log.txt
 build_final_log.txt
 build_error*.txt
@@ -32,3 +35,6 @@ _agent/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Project specific exclusions
+firestore.rules
