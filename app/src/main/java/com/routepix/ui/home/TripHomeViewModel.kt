@@ -48,7 +48,7 @@ class TripHomeViewModel : ViewModel() {
         }
     }
 
-    private var hasWarmedDisk = false
+    private var hasWarmStartedThisSession = false
 
     private fun observeTrips() {
         viewModelScope.launch {
@@ -64,17 +64,16 @@ class TripHomeViewModel : ViewModel() {
                         trips = trips,
                         isLoading = false
                     )
-                    if (!hasWarmedDisk) {
-                        hasWarmedDisk = true
-                        // Step 1: load persisted filePaths from disk → reconstructs URLs instantly,
-                        // zero network calls for photos we've already seen before.
+                    // Run once per process lifetime (not per Firestore update).
+                    // warmFromDisk: instantly rebuilds the URL map from disk so
+                    //   Coil can serve cached bytes on the first frame.
+                    // prefetchAllTrips: re-resolves anything stale (>23h) or new —
+                    //   runs every session so Telegram CDN URLs never silently expire.
+                    if (!hasWarmStartedThisSession) {
+                        hasWarmStartedThisSession = true
                         com.routepix.data.cache.ThumbnailCache.warmFromDisk(trips)
+                        com.routepix.data.cache.ThumbnailCache.prefetchAllTrips(trips)
                     }
-                    // Step 2: fetch only photos NOT already in the in-memory cache.
-                    // On a fresh install this resolves everything; on update/restart
-                    // warmFromDisk will have pre-populated known entries so only truly
-                    // new photos cause network calls — and isPrefetching stays false if none.
-                    com.routepix.data.cache.ThumbnailCache.prefetchAllTrips(trips)
                 }
         }
     }

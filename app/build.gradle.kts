@@ -14,8 +14,8 @@ android {
         applicationId = "com.routepix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 22
-        versionName = "2.5.0"
+        versionCode = 23
+        versionName = "2.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -27,6 +27,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
