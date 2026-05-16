@@ -348,7 +348,6 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
             val logoutInteractionSource = remember { MutableInteractionSource() }
             val isLogoutPressed by logoutInteractionSource.collectIsPressedAsState()
             val logoutScale by animateFloatAsState(

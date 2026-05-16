@@ -20,5 +20,7 @@ data class QueuedPhoto(
     val lng: Double? = null,
     val tag: String? = null,
     val md5Hash: String,
-    val isMotionPhoto: Boolean = false
+    val isMotionPhoto: Boolean = false,
+    /** Top AI-detected concepts, comma-separated (e.g. "Mountain,Sky,Snow"). Null if labeling failed. */
+    val aiLabels: String? = null
 )

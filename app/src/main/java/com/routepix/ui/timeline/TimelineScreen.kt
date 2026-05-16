@@ -93,6 +93,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -142,6 +144,12 @@ fun TimelineScreen(
     val viewMode by timelineViewModel.viewMode.collectAsState()
     val pendingUpload by photoPickerViewModel.pendingUpload.collectAsState()
     val pickerQueueState by photoPickerViewModel.queueState.collectAsState()
+
+    // ── Semantic Search state ──────────────────────────────────────────────────
+    val searchQuery    by timelineViewModel.searchQuery.collectAsState()
+    val searchResults  by timelineViewModel.searchResults.collectAsState()
+    val isSearchActive by timelineViewModel.isSearchActive.collectAsState()
+    var showSearch     by rememberSaveable { mutableStateOf(false) }
     
     var selectedGroupKey by rememberSaveable { mutableStateOf<String?>(null) }
     var showTagEditSheet by rememberSaveable { mutableStateOf(false) }
@@ -494,6 +502,17 @@ fun TimelineScreen(
                             }
                         }
                     } else {
+                        // ── Search toggle ─────────────────────────────────────────────────
+                        IconButton(onClick = {
+                            showSearch = !showSearch
+                            if (!showSearch) timelineViewModel.clearSearch()
+                        }) {
+                            Icon(
+                                imageVector = if (showSearch) Icons.Default.SearchOff else Icons.Default.Search,
+                                contentDescription = if (showSearch) "Close search" else "Search photos by scene or object",
+                                tint = if (showSearch) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         IconButton(onClick = { showQualityInfo = true }) {
                             Icon(Icons.Default.Info, contentDescription = "About image quality", tint = MaterialTheme.colorScheme.primary)
                         }
@@ -569,10 +588,43 @@ fun TimelineScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-            if (photos.isEmpty()) {
+
+            // ── Animated semantic search bar ─────────────────────────────────────
+            AnimatedVisibility(
+                visible = showSearch,
+                enter = androidx.compose.animation.expandVertically() +
+                        androidx.compose.animation.fadeIn(animationSpec = tween(200)),
+                exit  = androidx.compose.animation.shrinkVertically() +
+                        androidx.compose.animation.fadeOut(animationSpec = tween(150))
+            ) {
+                SemanticSearchBar(
+                    query        = searchQuery,
+                    onQueryChange = { timelineViewModel.updateSearchQuery(it) },
+                    modifier     = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top    = padding.calculateTopPadding() + 8.dp,
+                            start  = 16.dp,
+                            end    = 16.dp,
+                            bottom = 4.dp
+                        )
+                )
+            }
+
+            // ── Main content: search results or normal album grid ─────────────
+            if (isSearchActive) {
+                SearchResultsGrid(
+                    results           = searchResults,
+                    timelineViewModel = timelineViewModel,
+                    onPhotoClick      = { idx -> selectedPhotoIndex = idx },
+                    padding           = if (showSearch) PaddingValues(
+                        top    = 0.dp,   // search bar already provides top spacing
+                        bottom = padding.calculateBottomPadding()
+                    ) else padding
+                )
+            } else if (photos.isEmpty()) {
                 EmptyTimelineState(
-                    modifier = Modifier.fillMaxSize()
-                        .padding(padding)
+                    modifier = Modifier.fillMaxSize().padding(padding)
                 )
             } else {
                 Crossfade(
@@ -1854,4 +1906,172 @@ private fun formatTimestamp(timestamp: Long): String {
     return SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
         .format(Date(timestamp))
 }
+
+// ── Semantic Search Composables ──────────────────────────────────────────────
+
+/**
+ * A pill-shaped, auto-focused search field that appears below the top bar
+ * when the user taps the search icon.
+ */
+@Composable
+private fun SemanticSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // wait for AnimatedVisibility to complete
+        focusRequester.requestFocus()
+    }
+
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.focusRequester(focusRequester),
+        placeholder = {
+            Text(
+                text = "Search by scene, object, place…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(28.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            imeAction = androidx.compose.ui.text.input.ImeAction.Search
+        )
+    )
+}
+
+/**
+ * Flat 3-column grid shown when an AI search query is active.
+ * Each cell shows the top AI label as a chip overlay in the bottom-left corner.
+ * Displays an illustrated empty state when no photos match.
+ */
+@Composable
+private fun SearchResultsGrid(
+    results: List<PhotoMeta>,
+    timelineViewModel: TimelineViewModel,
+    onPhotoClick: (Int) -> Unit,
+    padding: PaddingValues,
+    modifier: Modifier = Modifier
+) {
+    if (results.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ImageSearch,
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = "No photos found",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Try: mountain, food, car, beach, sky…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    } else {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top    = padding.calculateTopPadding() + 8.dp,
+                bottom = padding.calculateBottomPadding() + 80.dp,
+                start  = 4.dp,
+                end    = 4.dp
+            ),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalArrangement   = Arrangement.spacedBy(3.dp)
+        ) {
+            items(results, key = { it.photoId }) { photo ->
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val itemScale by animateFloatAsState(
+                    targetValue = if (isPressed) 0.95f else 1f,
+                    label = "search_cell_scale"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .aspectRatio(1f)
+                        .graphicsLayer { scaleX = itemScale; scaleY = itemScale }
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(interactionSource = interactionSource,
+                                   indication = androidx.compose.foundation.LocalIndication.current) {
+                            onPhotoClick(results.indexOf(photo))
+                        }
+                ) {
+                    TimelineMediaItem(
+                        photo              = photo,
+                        timelineViewModel  = timelineViewModel,
+                        contentDescription = photo.aiLabels,
+                        modifier           = Modifier.fillMaxSize(),
+                        contentScale       = ContentScale.Crop
+                    )
+
+                    // ── Top AI label chip ────────────────────────────────────
+                    photo.aiLabels?.split(",")?.firstOrNull()?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { topLabel ->
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.Black.copy(alpha = 0.58f))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text  = topLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                }
+            }
+        }
+    }
+}
+
 

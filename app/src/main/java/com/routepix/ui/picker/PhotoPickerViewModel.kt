@@ -13,6 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.routepix.data.local.QueuedPhoto
 import com.routepix.data.local.RoutepixDatabase
+import com.routepix.util.ImageLabeler
 import com.routepix.util.PhotoUtils
 import com.routepix.worker.PhotoUploadWorker
 import com.routepix.data.model.PhotoMeta
@@ -380,7 +381,12 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
 
             val exif = PhotoUtils.extractExif(context, uri)
             val isMotion = PhotoUtils.isMotionPhoto(context, uri)
-            Log.d(TAG, "Enqueue: uri=$uri isMotion=$isMotion")
+
+            // ── AI Labeling (on-device, offline, Dispatchers.IO) ──────────────────
+            // Runs eagerly here so the photo enters the DB fully hydrated.
+            // Non-fatal: if labeling fails, aiLabels = null and the photo still queues.
+            val aiLabels = ImageLabeler.label(context, uri)
+            Log.d(TAG, "Enqueue: uri=$uri isMotion=$isMotion aiLabels=$aiLabels")
 
             val queuedPhoto = QueuedPhoto(
                 localUri = uri.toString(),
@@ -390,7 +396,8 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
                 lng = exif.lng,
                 tag = tag,
                 md5Hash = md5,
-                isMotionPhoto = isMotion
+                isMotionPhoto = isMotion,
+                aiLabels = aiLabels
             )
             val insertedId = dao.insert(queuedPhoto).toInt()
             EnqueueResult.Queued(insertedId)

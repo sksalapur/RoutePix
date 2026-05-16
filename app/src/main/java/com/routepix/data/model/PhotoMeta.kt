@@ -15,6 +15,8 @@ data class PhotoMeta(
     val tag: String? = null,
     val md5Hash: String? = null,
     val sizeBytes: Long? = null,
+    /** Top AI-detected concepts, comma-separated (e.g. "Mountain,Sky,Snow"). Null for legacy photos. */
+    val aiLabels: String? = null,
     @get:PropertyName("isMotionPhoto")
     @set:PropertyName("isMotionPhoto")
     var isMotionPhoto: Boolean = false

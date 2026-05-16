@@ -117,6 +117,65 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         photos.mapNotNull { it.tag }.distinct().sorted()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // ── Semantic Search ────────────────────────────────────────────────────────
+    // Pure in-memory filter on the already-loaded _photos list.
+    // No extra Firestore queries — zero network cost.
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    /**
+     * Searches AI labels, manual tag, AND reverse-geocoded place name.
+     * Expands common queries via a synonym map so "water" matches "lake", "river" etc.
+     * Returns an empty list when the query is blank (search inactive).
+     */
+    val searchResults: StateFlow<List<PhotoMeta>> = combine(_photos, _searchQuery) { photos, query ->
+        val rawQuery = query.trim().lowercase()
+        if (rawQuery.isBlank()) emptyList()
+        else {
+            // ── Synonym expansion ──────────────────────────────────────────────
+            // Covers the gap where ML Kit uses a specific label (e.g. "Lake") but
+            // the user searches for a generic concept (e.g. "water").
+            val synonyms: Map<String, List<String>> = mapOf(
+                "water"     to listOf("lake", "river", "beach", "sea", "ocean", "pond",
+                                      "stream", "waterfall", "backwater", "bay", "coast",
+                                      "reservoir", "canal", "water resources"),
+                "nature"    to listOf("tree", "plant", "forest", "mountain", "grass",
+                                      "jungle", "hill", "valley", "landscape", "flower",
+                                      "leaf", "vegetation", "wilderness", "sky"),
+                "city"      to listOf("building", "street", "road", "urban", "architecture",
+                                      "town", "bridge", "skyscraper"),
+                "food"      to listOf("meal", "dish", "cuisine", "restaurant", "snack",
+                                      "drink", "fruit", "vegetable", "dessert"),
+                "people"    to listOf("person", "human", "crowd", "man", "woman", "child",
+                                      "portrait", "selfie", "group"),
+                "transport" to listOf("car", "vehicle", "bus", "boat", "ship", "train",
+                                      "motorcycle", "bicycle", "airplane", "truck"),
+                "night"     to listOf("dark", "light", "evening", "dusk", "sunset",
+                                      "sunrise", "moon", "star")
+            )
+            val expandedQueries = (synonyms[rawQuery] ?: emptyList()) + rawQuery
+
+            photos.filter { photo ->
+                val labelsText   = photo.aiLabels?.lowercase() ?: ""
+                val tagText      = photo.tag?.lowercase() ?: ""
+                val placeText    = photo.placeName?.lowercase() ?: ""
+
+                expandedQueries.any { q ->
+                    labelsText.contains(q) || tagText.contains(q) || placeText.contains(q)
+                }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** True when the user has typed a non-blank query. Drives UI mode switching. */
+    val isSearchActive: StateFlow<Boolean> = _searchQuery
+        .map { it.isNotBlank() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun updateSearchQuery(q: String) { _searchQuery.value = q }
+    fun clearSearch() { _searchQuery.value = "" }
+
     val groupedPhotos: StateFlow<Map<String, List<PhotoMeta>>> =
         combine(_photos, _sortMode, _userNames) { photoList, mode, _ ->
             groupPhotos(photoList, mode)

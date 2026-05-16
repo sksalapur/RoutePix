@@ -14,8 +14,8 @@ android {
         applicationId = "com.routepix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "2.5.1"
+        versionCode = 24
+        versionName = "2.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -102,6 +102,9 @@ dependencies {
 
     // Security Crypto
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // ML Kit — on-device image labeling (bundled model, offline-first, no Play Services required)
+    implementation("com.google.mlkit:image-labeling:17.0.9")
 
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
