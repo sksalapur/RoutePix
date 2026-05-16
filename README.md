@@ -89,7 +89,7 @@ Every photo sharing solution compromises on something:
 - **On-device ML Kit image labeling** runs locally at upload time — no cloud API, no cost, works fully offline.
 - Every photo is labeled with up to 8 high-confidence concepts (`Beach`, `Lake`, `Mountain`, `Sunset`, etc.) and the labels are persisted in both Room and Firestore as `aiLabels`.
 - **Semantic search bar** in the Timeline: search by concept, not just filename. Type `water` — the app automatically expands it to `lake`, `river`, `beach`, `ocean`, `waterfall`, and more via a built-in synonym map.
-- **Location-aware**: searches also match the reverse-geocoded `placeName` field, so searching `Goa` surfaces all photos taken there regardless of their AI labels.
+- **Tag-aware**: searches also match the user-assigned tag on each photo, so grouping photos by trip segment (`Day 1 - Beach`) makes them instantly discoverable.
 - Privacy-first: all inference runs on-device using a **6 MB bundled TFLite model** — your photos never leave the phone for AI processing.
 
 ### 📸 Collaborative Trip Albums
@@ -140,7 +140,7 @@ Every photo sharing solution compromises on something:
 
 | Version | Highlight |
 |---------|-----------|
-| **v2.6.0** | 🤖 **AI-Powered Semantic Search** — on-device ML Kit labeling, synonym-aware search, location-aware filtering (`placeName`). Search your trips by concept: `water`, `nature`, `people`, `city`. |
+| **v2.6.0** | 🤖 **AI-Powered Semantic Search** — on-device ML Kit labeling, synonym-aware search. Search your trips by concept: `water`, `nature`, `people`, `city`. |
 | **v2.5.1** | CDN TTL fix — timestamp-based cache invalidation for expiring Telegram file URLs |
 | **v2.0.1** | UX polish — immediate loading overlay after photo selection, download filename convention, `DOWNLOAD_WITHOUT_NOTIFICATION` permission fix |
 | **v2.0.0** | **Dual-Format Upload Engine** — every photo uploaded as both compressed thumbnail (`sendPhoto`) and byte-perfect original (`sendDocument`). Motion Photo support. |

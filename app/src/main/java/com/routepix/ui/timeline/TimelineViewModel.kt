@@ -157,12 +157,11 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             val expandedQueries = (synonyms[rawQuery] ?: emptyList()) + rawQuery
 
             photos.filter { photo ->
-                val labelsText   = photo.aiLabels?.lowercase() ?: ""
-                val tagText      = photo.tag?.lowercase() ?: ""
-                val placeText    = photo.placeName?.lowercase() ?: ""
+                val labelsText = photo.aiLabels?.lowercase() ?: ""
+                val tagText    = photo.tag?.lowercase() ?: ""
 
                 expandedQueries.any { q ->
-                    labelsText.contains(q) || tagText.contains(q) || placeText.contains(q)
+                    labelsText.contains(q) || tagText.contains(q)
                 }
             }
         }
