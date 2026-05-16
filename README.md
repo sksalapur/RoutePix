@@ -65,7 +65,7 @@ Every photo sharing solution compromises on something:
 │  │  → Motion Photos with embedded video intact  │               │
 │  │  → Files >50MB auto-compressed to fit limit  │               │
 │  │                                              │               │
-│  │  Step 3: ML Kit On-Device Labeling          │               │
+│  │  Step 3: ML Kit On-Device Labeling           │               │
 │  │  → Image labeled locally (no network)        │               │
 │  │  → Top-8 concepts at ≥0.60 confidence        │               │
 │  │  → aiLabels stored in Room + Firestore       │               │
