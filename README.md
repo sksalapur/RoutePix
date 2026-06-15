@@ -159,19 +159,48 @@ Every photo sharing solution compromises on something:
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Android Studio Ladybug+ with Kotlin 2.0
-- A Firebase project with Auth + Firestore enabled
-- A Telegram Bot (created via [@BotFather](https://t.me/BotFather))
+### 1. Install RoutePix
 
-### Setup
-1. Clone the repo and open in Android Studio
-2. Place your `google-services.json` in `app/`
-3. Build and run — sign in with Google
-4. Go to **Settings** → paste your Telegram Bot Token and Chat ID
-5. Create a trip and start uploading!
+1. Head to the [GitHub Releases](https://github.com/sksalapur/RoutePix/releases) page and download the latest APK.
+2. Open the APK on your Android device to install.
 
 > **Note:** Since RoutePix is distributed via GitHub Releases (not Play Store), Android may show a Play Protect warning. Tap **More details → Install anyway** to proceed.
+
+### 2. Get Your Telegram Credentials
+
+You need a **Bot Token** and a **Chat ID** from Telegram. Follow these steps:
+
+#### Get Bot Token
+1. Open Telegram and search for **@BotFather**.
+2. Send `/newbot` and follow the prompts to create a new bot.
+3. Copy the **Bot Token** provided by BotFather.
+
+#### Get Chat ID
+4. Open the newly created bot and send any message (e.g. "Hello").
+5. Search for **@userinfobot** in Telegram.
+6. Send any message to @userinfobot.
+7. Copy the numeric **Chat ID** shown in the reply.
+
+### 3. Configure RoutePix
+
+8. Launch RoutePix and sign in with your Google account.
+9. Go to **Settings** → **Telegram Bot Configuration**.
+10. Paste your **Bot Token** and **Chat ID** into the respective fields.
+11. Tap **Save** to store your credentials.
+12. Create a trip and start uploading!
+
+### Building from Source
+
+If you want to build RoutePix yourself instead of installing the APK:
+
+**Prerequisites:**
+- Android Studio Ladybug+ with Kotlin 2.0
+- A Firebase project with Auth + Firestore enabled
+
+**Steps:**
+1. Clone the repo and open in Android Studio.
+2. Place your `google-services.json` in `app/`.
+3. Build and run on your device or emulator.
 
 ---
 

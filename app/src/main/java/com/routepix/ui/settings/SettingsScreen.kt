@@ -98,12 +98,58 @@ fun SettingsScreen(
             onDismissRequest = { showTelegramGuide = false },
             title = { Text("How to get Telegram Credentials") },
             text = {
-                Column {
-                    Text("1. Search for @BotFather in Telegram.")
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    // --- Section: Get Bot Token ---
+                    Text(
+                        "Get Bot Token",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("1. Open Telegram and search for @BotFather.")
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("2. Send /newbot and follow prompts to get your Bot Token.")
+                    Text("2. Send /newbot and follow the prompts to create a new bot.")
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("3. Search for @userinfobot and send any message to get your Chat ID.")
+                    Text("3. Copy the Bot Token provided by BotFather.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("4. Paste the Bot Token into RoutePix.")
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // --- Section: Get Chat ID ---
+                    Text(
+                        "Get Chat ID",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("5. Open the newly created bot and send any message (e.g. \"Hello\").")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("6. Search for @userinfobot in Telegram.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("7. Send any message to @userinfobot.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("8. Copy the numeric Chat ID shown in the reply.")
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // --- Section: Finish ---
+                    Text(
+                        "Finish",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("9. Paste the Chat ID into RoutePix.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("10. Save your credentials.")
                 }
             },
             confirmButton = {
