@@ -1,6 +1,5 @@
-<p align="center">
-  ⚠️ <strong>Temporary Service Notice:</strong> Due to Telegram service restrictions in India, photo uploads may not function as expected until 22 June 2026.
-</p>
+> [!WARNING]
+> Due to Telegram service restrictions in India, RoutePix photo uploads may not function as expected until 22 June 2026.
 
 <h1 align="center">📸 RoutePix</h1>
 
