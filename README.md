@@ -1,4 +1,11 @@
 <p align="center">
+  ⚠️ <strong>Temporary Service Notice:</strong> Due to Telegram service restrictions in India, photo uploads may not function as expected until 22 June 2026.
+</p>
+
+<h1 align="center">📸 RoutePix</h1>
+
+
+<p align="center">
   <img src="app/src/main/res/drawable/ic_launcher_master.png" alt="RoutePix Logo" width="120" />
 </p>
 
