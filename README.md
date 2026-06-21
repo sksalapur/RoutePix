@@ -1,5 +1,5 @@
 > [!WARNING]
-> Due to Telegram service restrictions in India, RoutePix photo uploads may not function as expected until 22 June 2026.
+> Due to Telegram service restrictions in India, RoutePix may not function as expected until 22 June 2026. To access the app, use can always a VPN.
 
 <h1 align="center">📸 RoutePix</h1>
 
