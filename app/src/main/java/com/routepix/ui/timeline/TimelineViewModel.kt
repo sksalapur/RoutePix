@@ -6,6 +6,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
+import coil.imageLoader
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -188,6 +191,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     init {
         loadTrip()
         observePhotos()
+        observeAndPreCacheImages()
     }
 
     fun setSortMode(mode: SortMode) {
@@ -223,6 +227,63 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     private fun resolveAllImageUrls(photos: List<PhotoMeta>) {
         val token = _activeTrip.value?.telegramBotToken ?: return
         com.routepix.data.cache.ThumbnailCache.prefetchTrip(photos, token)
+    }
+
+    /**
+     * Proactively downloads ALL album thumbnails into Coil's persistent disk
+     * cache as soon as their CDN URLs become available.
+     *
+     * Problem solved:
+     *   Coil is lazy — it only fetches an image when its grid cell enters the
+     *   viewport. If the user scrolls too fast, the in-flight request is
+     *   cancelled and the download restarts on the next pass. This forces the
+     *   user to scroll slowly on first open to let every thumbnail cache.
+     *
+     * Solution:
+     *   Combine _photos and ThumbnailCache.resolvedUrls. Whenever either
+     *   changes (new photos added OR new URL resolved), enqueue a background
+     *   Coil download for any photo whose image isn't yet in the disk cache.
+     *   The download runs at background priority; it doesn't block the UI.
+     *   From the second open onwards, every thumbnail is an instant disk read.
+     */
+    private fun observeAndPreCacheImages() {
+        // Track fileIds already enqueued this session to avoid duplicate work
+        val alreadyEnqueued = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+        viewModelScope.launch(Dispatchers.IO) {
+            combine(_photos, com.routepix.data.cache.ThumbnailCache.resolvedUrls) { photos, urls ->
+                photos to urls
+            }
+            .filter { (photos, urls) -> photos.isNotEmpty() && urls.isNotEmpty() }
+            .collect { (photos, urls) ->
+                val imageLoader = getApplication<Application>().imageLoader
+
+                photos.forEach { photo ->
+                    val fileId = photo.telegramFileId
+                    val url = urls[fileId] ?: return@forEach
+
+                    // Skip if already enqueued this session
+                    if (!alreadyEnqueued.add(fileId)) return@forEach
+
+                    // Skip if Coil's persistent disk cache already has this image
+                    val isCached = imageLoader.diskCache
+                        ?.openSnapshot(fileId)
+                        ?.also { it.close() } != null
+                    if (isCached) return@forEach
+
+                    // Enqueue a silent background download into Coil's disk cache.
+                    // memoryCachePolicy=DISABLED so we don't evict visible images
+                    // from memory just to pre-cache off-screen ones.
+                    imageLoader.enqueue(
+                        ImageRequest.Builder(getApplication())
+                            .data(url)
+                            .diskCacheKey(fileId)
+                            .memoryCachePolicy(CachePolicy.DISABLED)
+                            .build()
+                    )
+                }
+            }
+        }
     }
 
     /**
