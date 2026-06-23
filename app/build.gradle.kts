@@ -20,6 +20,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing config — reads from environment variables injected by CI.
+    // Locally: falls back to debug signing if env vars are not set.
+    signingConfigs {
+        val keystorePath = System.getenv("KEYSTORE_PATH")
+        val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+        val keyAlias = System.getenv("KEY_ALIAS")
+        val keyPassword = System.getenv("KEY_PASSWORD")
+
+        if (keystorePath != null && keystorePassword != null &&
+            keyAlias != null && keyPassword != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -27,7 +46,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            // Use release signing if available (CI), else debug signing (local)
+            signingConfig = if (signingConfigs.findByName("release") != null)
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
         }
     }
 

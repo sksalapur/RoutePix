@@ -38,3 +38,8 @@ Thumbs.db
 
 # Project specific exclusions
 firestore.rules
+
+# Release keystore — NEVER commit to git. Store as GitHub Secret instead.
+*.jks
+*.keystore
+*.jks.b64
