@@ -11,6 +11,10 @@ jobs:
   build-and-release:
     name: Build & Release
     runs-on: ubuntu-latest
+    # Grant write permission so GITHUB_TOKEN can create releases and upload APKs.
+    # Default token is read-only — without this you get "Resource not accessible by integration".
+    permissions:
+      contents: write
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
