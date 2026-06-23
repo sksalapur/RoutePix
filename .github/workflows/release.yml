@@ -90,10 +90,11 @@ jobs:
             RAW=$(git log $LAST_TAG..HEAD --pretty=format:"%s")
           fi
 
-          # Filter out internal commit types — these aren't useful to end users
-          COMMITS=$(echo "$RAW" | grep -vE '^(ci|chore|docs|build|test|refactor|style|perf)\b' | sed 's/^/- /')
+          # WHITELIST: only include feat: and fix: commits — anything else
+          # (Update README.md, ci:, chore:, docs:, etc.) is excluded automatically.
+          COMMITS=$(echo "$RAW" | grep -E '^(feat|fix)(\(.+\))?[!:]' | sed 's/^/- /')
 
-          # If everything was filtered out, show a generic message
+          # If no feat/fix commits, show a generic message
           if [ -z "$COMMITS" ]; then
             COMMITS="- Internal improvements and fixes"
           fi
@@ -117,7 +118,6 @@ jobs:
             **Build info:** versionCode `${{ steps.version.outputs.code }}`
           files: app/build/outputs/apk/release/RoutePix-v${{ steps.version.outputs.name }}.apk
           make_latest: true
-          update_existing_release: true
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
