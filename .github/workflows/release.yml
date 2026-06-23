@@ -35,11 +35,11 @@ jobs:
 
       # ── 4. Decode google-services.json ───────────────────────────────────────
       # google-services.json contains Firebase credentials so it is gitignored.
-      # We store its content as a GitHub Secret (plain JSON, not base64) and
-      # write it to the exact path the Google Services plugin expects.
-      - name: Write google-services.json
+      # Stored as BASE64 in GitHub Secrets (same as keystore) — avoids JSON
+      # corruption that happens when using echo with special characters/newlines.
+      - name: Decode google-services.json
         run: |
-          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > app/google-services.json
 
       # ── 5. Read version from build.gradle.kts ───────────────────────────────
       - name: Extract version name and code
