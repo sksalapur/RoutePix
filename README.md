@@ -1,6 +1,3 @@
-<h1 align="center">📸 RoutePix</h1>
-
-
 <p align="center">
   <img src="app/src/main/res/drawable/ic_launcher_master.png" alt="RoutePix Logo" width="120" />
 </p>
