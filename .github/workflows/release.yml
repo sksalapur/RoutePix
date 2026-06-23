@@ -44,7 +44,13 @@ jobs:
           echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION_NAME" >> $GITHUB_OUTPUT
 
-      # ── 5. Build signed release APK ──────────────────────────────────────────
+      # ── 5. Make gradlew executable ───────────────────────────────────────────
+      # Windows doesn't preserve Unix file permissions — gradlew arrives on the
+      # Linux runner without the execute bit, causing "Permission denied" (exit 126).
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # ── 6. Build signed release APK ──────────────────────────────────────────
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/routepix-release.jks
