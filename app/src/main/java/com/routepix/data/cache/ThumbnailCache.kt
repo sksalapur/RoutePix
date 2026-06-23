@@ -24,13 +24,29 @@ import java.util.concurrent.ConcurrentHashMap
  * Persistence strategy:
  *  - Stores `fileId → "$filePath|$timestamp"` in SharedPreferences.
  *  - On cold start, warmFromDisk() reconstructs URLs instantly so Coil can
- *    serve from its own disk cache immediately (zero network calls on first paint).
+ *    serve from its own **persistent** disk cache immediately (zero network
+ *    calls on first paint — even after days of inactivity).
  *  - prefetchAllTrips() ALWAYS runs on every app open and re-resolves any
- *    entries older than STALE_THRESHOLD_MS (23 hours), because Telegram CDN
- *    URLs expire after ~1 hour. This keeps URLs fresh without hammering the API.
- *  - Only brand-new photos (never seen before) AND stale entries trigger getFile calls.
+ *    entries older than STALE_THRESHOLD_MS (6 days), because Telegram CDN
+ *    URLs expire after ~1 hour. This keeps URLs fresh without hammering the
+ *    API, while still allowing Coil to serve images from its pixel cache using
+ *    the temporarily stale URL for the brief warmup window.
+ *  - Only brand-new photos (never seen before) AND truly stale entries (>6d)
+ *    trigger getFile calls.
  *
  * Key = telegramFileId  |  In-memory value = fully resolved CDN URL
+ *
+ * WHY 6 DAYS?
+ *  Coil's disk cache (now in filesDir, never auto-cleared) stores image pixels.
+ *  Even with a "stale" URL in SharedPreferences, warmFromDisk() emits the
+ *  old URL immediately — Coil finds the pixels on disk by diskCacheKey and
+ *  renders them. Meanwhile, prefetchAllTrips() re-resolves the URL in the
+ *  background and calls put() to refresh it for subsequent loads.
+ *
+ *  The old 23h threshold caused EVERY app open after a night's sleep to do a
+ *  full re-resolve for all photos before they could display. With 6 days,
+ *  only photos older than 6 days need re-resolution, greatly reducing cold-
+ *  start network traffic while keeping the "images appear instantly" guarantee.
  */
 object ThumbnailCache {
 
@@ -38,16 +54,24 @@ object ThumbnailCache {
     private const val SEPARATOR = "|"
 
     /**
-     * Re-resolve any URL older than this. Set to 23 hours — well within Telegram's
-     * ~1 hour CDN URL lifetime, ensuring URLs are always fresh on next app open.
+     * Re-resolve any URL older than this.
+     *
+     * Set to 6 days. Rationale:
+     *  - Telegram CDN URLs expire after ~1 hour, but Coil's pixel cache
+     *    (now in persistent filesDir) keeps the image bytes indefinitely.
+     *  - warmFromDisk() emits even stale URLs so Coil can serve pixels from
+     *    its persistent disk cache while fresh URLs are resolved in background.
+     *  - 6 days means most users only need a re-resolve once a week per photo,
+     *    instead of on every app open.
      */
-    private const val STALE_THRESHOLD_MS = 23L * 60 * 60 * 1000
+    private const val STALE_THRESHOLD_MS = 6L * 24 * 60 * 60 * 1000 // 6 days
 
     // In-memory map: fileId → CDN URL
     private val urlCache = ConcurrentHashMap<String, String>()
 
-    // Track which fileIds were loaded from disk (may have stale URLs)
-    // These will be re-resolved by prefetchAllTrips even if already in urlCache
+    // Track which fileIds were loaded from disk and have a stale (expired) URL.
+    // These are still emitted immediately (so Coil can try the pixel cache),
+    // but prefetchAllTrips will re-resolve them in the background.
     private val staledFromDisk = ConcurrentHashMap.newKeySet<String>()
 
     private var prefs: SharedPreferences? = null
@@ -66,9 +90,20 @@ object ThumbnailCache {
     }
 
     /**
-     * Load persisted entries from disk so Coil can serve from its own disk cache
-     * immediately on the first frame. Marks stale entries so prefetchAllTrips
-     * knows to re-resolve them in the background.
+     * Load ALL persisted entries from disk immediately on cold start.
+     *
+     * This is called before any Firestore fetch so Coil can serve image pixels
+     * from its persistent disk cache on the very first frame — without waiting
+     * for network.
+     *
+     * Strategy:
+     *  - ALL known fileIds (fresh or stale) are loaded into urlCache immediately
+     *    and emitted via _resolvedUrls. This lets Coil attempt a disk cache hit
+     *    using the diskCacheKey regardless of URL freshness.
+     *  - Entries older than STALE_THRESHOLD_MS are added to staledFromDisk so
+     *    prefetchAllTrips knows to re-resolve them in the background.
+     *  - We do NOT filter by trip here — we load everything from SharedPrefs to
+     *    maximise the chance of a Coil disk cache hit on the first frame.
      */
     fun warmFromDisk(trips: List<com.routepix.data.model.Trip>) {
         val localPrefs = prefs ?: return
@@ -76,24 +111,36 @@ object ThumbnailCache {
             val now = System.currentTimeMillis()
             val allEntries = localPrefs.all
 
-            trips.forEach { trip ->
-                val token = trip.telegramBotToken ?: return@forEach
-                allEntries.forEach { (fileId, raw) ->
-                    if (raw !is String) return@forEach
-                    val parts = raw.split(SEPARATOR)
-                    val filePath = parts[0]
-                    val timestamp = parts.getOrNull(1)?.toLongOrNull() ?: 0L
-                    val isStale = (now - timestamp) > STALE_THRESHOLD_MS
+            // Build a quick lookup of token per trip for URL reconstruction
+            val tokenByTripId = trips.associate { it.tripId to it.telegramBotToken }
 
-                    if (!urlCache.containsKey(fileId)) {
-                        // Always populate so UI has something to show Coil immediately
-                        urlCache[fileId] = "https://api.telegram.org/file/bot$token/$filePath"
-                    }
+            // We don't know which fileId belongs to which trip here, so we
+            // reconstruct with the first available token as a placeholder.
+            // The URL structure is the same (api.telegram.org/file/bot<TOKEN>/<PATH>)
+            // and Coil keying is by diskCacheKey (=fileId), NOT the URL, so
+            // even a "wrong-token" URL will still cause a disk cache hit.
+            // The correct URL is re-resolved by prefetchAllTrips shortly after.
+            val fallbackToken = trips.firstOrNull { !it.telegramBotToken.isNullOrBlank() }
+                ?.telegramBotToken
 
-                    if (isStale) {
-                        // Flag for re-resolution by prefetchAllTrips
-                        staledFromDisk.add(fileId)
-                    }
+            allEntries.forEach { (fileId, raw) ->
+                if (raw !is String) return@forEach
+                val parts = raw.split(SEPARATOR)
+                val filePath = parts[0]
+                if (filePath.isBlank()) return@forEach
+                val timestamp = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+                val isStale = (now - timestamp) > STALE_THRESHOLD_MS
+
+                if (!urlCache.containsKey(fileId)) {
+                    // Emit whatever URL we can reconstruct so Coil can find
+                    // pixels in its persistent disk cache immediately
+                    val token = fallbackToken ?: return@forEach
+                    urlCache[fileId] = "https://api.telegram.org/file/bot$token/$filePath"
+                }
+
+                if (isStale) {
+                    // Flag for background re-resolution by prefetchAllTrips
+                    staledFromDisk.add(fileId)
                 }
             }
 
@@ -105,6 +152,11 @@ object ThumbnailCache {
 
     fun get(telegramFileId: String): String? = urlCache[telegramFileId]
 
+    /**
+     * Returns true only if this fileId has a fresh (non-stale) URL in memory.
+     * Stale entries are still in urlCache (for immediate Coil disk hits) but
+     * contain() returns false so prefetchAllTrips re-resolves them.
+     */
     fun contains(telegramFileId: String): Boolean =
         urlCache.containsKey(telegramFileId) && !staledFromDisk.contains(telegramFileId)
 
@@ -121,10 +173,15 @@ object ThumbnailCache {
      *
      * Resolves:
      *  1. Photos never seen before (not in urlCache at all)
-     *  2. Photos whose cached URL is stale (> 23 hours old)
+     *  2. Photos whose cached URL is stale (> 6 days old)
      *
      * Photos with a fresh URL are skipped entirely — no network calls.
      * Sets isPrefetching=true only if there is actual work to do.
+     *
+     * After warmFromDisk() has run, staledFromDisk contains the IDs that need
+     * re-resolution. This function re-fetches their file paths from Telegram,
+     * calls put() to update SharedPrefs + urlCache, and emits via _resolvedUrls
+     * so TelegramAsyncImage picks up the refreshed URL automatically.
      */
     fun prefetchAllTrips(trips: List<com.routepix.data.model.Trip>) {
         scope.launch {
