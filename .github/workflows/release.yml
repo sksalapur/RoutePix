@@ -76,32 +76,51 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk \
              app/build/outputs/apk/release/RoutePix-v${{ steps.version.outputs.name }}.apk
 
-      # ── 9. Generate changelog from commit messages ───────────────────────────
-      # Collects commit subjects since the last tag.
-      # Filters out internal/tooling commits (ci:, chore:, docs:, build:, test:)
-      # so only user-facing changes appear in the release notes.
-      - name: Generate changelog
-        id: changelog
+      # ── 9. Prepare release notes ─────────────────────────────────────────────
+      # Priority 1: Use release_notes/v{version}.md if it exists.
+      #             Write these by hand for major releases — full markdown,
+      #             screenshots, anything you want.
+      # Priority 2: Auto-generate from feat: and fix: commit messages.
+      #             Good enough for minor fixes and patches.
+      - name: Prepare release notes
+        id: notes
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -z "$LAST_TAG" ]; then
-            RAW=$(git log --pretty=format:"%s" | head -30)
+          VERSION="${{ steps.version.outputs.name }}"
+          NOTES_FILE="release_notes/v${VERSION}.md"
+
+          if [ -f "$NOTES_FILE" ]; then
+            echo "Using manual release notes: $NOTES_FILE"
+            # Append the build info footer to the manual notes
+            cat "$NOTES_FILE" > /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+            echo "---" >> /tmp/release_body.md
+            echo "**Build info:** versionCode \`${{ steps.version.outputs.code }}\`" >> /tmp/release_body.md
+            echo "source=manual" >> $GITHUB_OUTPUT
           else
-            RAW=$(git log $LAST_TAG..HEAD --pretty=format:"%s")
+            echo "No manual notes found — generating from commits."
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -z "$LAST_TAG" ]; then
+              RAW=$(git log --pretty=format:"%s" | head -30)
+            else
+              RAW=$(git log $LAST_TAG..HEAD --pretty=format:"%s")
+            fi
+
+            # Only feat: and fix: commits appear in release notes.
+            # Everything else (ci:, chore:, docs:, "Update README", etc.) is excluded.
+            COMMITS=$(echo "$RAW" | grep -E '^(feat|fix)(\(.+\))?[!:]' | sed 's/^/- /')
+            if [ -z "$COMMITS" ]; then
+              COMMITS="- Internal improvements and fixes"
+            fi
+
+            # Write the auto-generated body to a temp file
+            echo "## What's new in v${VERSION}" > /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+            echo "$COMMITS" >> /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+            echo "---" >> /tmp/release_body.md
+            echo "**Build info:** versionCode \`${{ steps.version.outputs.code }}\`" >> /tmp/release_body.md
+            echo "source=auto" >> $GITHUB_OUTPUT
           fi
-
-          # WHITELIST: only include feat: and fix: commits — anything else
-          # (Update README.md, ci:, chore:, docs:, etc.) is excluded automatically.
-          COMMITS=$(echo "$RAW" | grep -E '^(feat|fix)(\(.+\))?[!:]' | sed 's/^/- /')
-
-          # If no feat/fix commits, show a generic message
-          if [ -z "$COMMITS" ]; then
-            COMMITS="- Internal improvements and fixes"
-          fi
-
-          echo "changes<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
       # ── 10. Create GitHub Release ─────────────────────────────────────────────
       - name: Create GitHub Release
@@ -109,13 +128,7 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.name }}
           name: "RoutePix v${{ steps.version.outputs.name }}"
-          body: |
-            ## What's new in v${{ steps.version.outputs.name }}
-
-            ${{ steps.changelog.outputs.changes }}
-
-            ---
-            **Build info:** versionCode `${{ steps.version.outputs.code }}`
+          body_path: /tmp/release_body.md
           files: app/build/outputs/apk/release/RoutePix-v${{ steps.version.outputs.name }}.apk
           make_latest: true
           fail_on_unmatched_files: true
