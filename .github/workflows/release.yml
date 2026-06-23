@@ -27,14 +27,21 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # ── 3. Decode keystore from GitHub Secret ────────────────────────────────
-      # The keystore is stored as a base64-encoded string in GitHub Secrets.
-      # We decode it to a temp file and pass its path to Gradle via env vars.
+      # ── 3. Decode release keystore ───────────────────────────────────────────
+      # Keystore is stored as a base64 string in GitHub Secrets (never in git).
       - name: Decode release keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ runner.temp }}/routepix-release.jks
 
-      # ── 4. Read version from build.gradle.kts ───────────────────────────────
+      # ── 4. Decode google-services.json ───────────────────────────────────────
+      # google-services.json contains Firebase credentials so it is gitignored.
+      # We store its content as a GitHub Secret (plain JSON, not base64) and
+      # write it to the exact path the Google Services plugin expects.
+      - name: Write google-services.json
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+
+      # ── 5. Read version from build.gradle.kts ───────────────────────────────
       - name: Extract version name and code
         id: version
         run: |
@@ -44,13 +51,13 @@ jobs:
           echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION_NAME" >> $GITHUB_OUTPUT
 
-      # ── 5. Make gradlew executable ───────────────────────────────────────────
+      # ── 6. Make gradlew executable ───────────────────────────────────────────
       # Windows doesn't preserve Unix file permissions — gradlew arrives on the
       # Linux runner without the execute bit, causing "Permission denied" (exit 126).
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # ── 6. Build signed release APK ──────────────────────────────────────────
+      # ── 7. Build signed release APK ──────────────────────────────────────────
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/routepix-release.jks
@@ -59,28 +66,39 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
 
-      # ── 6. Rename APK to include version ─────────────────────────────────────
+      # ── 8. Rename APK to include version ─────────────────────────────────────
       - name: Rename APK
         run: |
           mv app/build/outputs/apk/release/app-release.apk \
              app/build/outputs/apk/release/RoutePix-v${{ steps.version.outputs.name }}.apk
 
-      # ── 7. Generate changelog from commit messages ───────────────────────────
-      # Gets commit messages since the last tag (or all commits if no tags yet)
+      # ── 9. Generate changelog from commit messages ───────────────────────────
+      # Collects commit subjects since the last tag.
+      # Filters out internal/tooling commits (ci:, chore:, docs:, build:, test:)
+      # so only user-facing changes appear in the release notes.
       - name: Generate changelog
         id: changelog
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" | head -20)
+            RAW=$(git log --pretty=format:"%s" | head -30)
           else
-            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"- %s")
+            RAW=$(git log $LAST_TAG..HEAD --pretty=format:"%s")
           fi
+
+          # Filter out internal commit types — these aren't useful to end users
+          COMMITS=$(echo "$RAW" | grep -vE '^(ci|chore|docs|build|test|refactor|style|perf)\b' | sed 's/^/- /')
+
+          # If everything was filtered out, show a generic message
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- Internal improvements and fixes"
+          fi
+
           echo "changes<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # ── 8. Create GitHub Release ─────────────────────────────────────────────
+      # ── 10. Create GitHub Release ─────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -95,14 +113,14 @@ jobs:
             **Build info:** versionCode `${{ steps.version.outputs.code }}`
           files: app/build/outputs/apk/release/RoutePix-v${{ steps.version.outputs.name }}.apk
           make_latest: true
-          # If the tag already exists (re-push without version bump), update the release
           update_existing_release: true
-          # Don't fail if tag already exists — just update
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 9. Clean up keystore ─────────────────────────────────────────────────
-      - name: Clean up keystore
+      # ── 11. Clean up secrets from disk ───────────────────────────────────────
+      - name: Clean up sensitive files
         if: always()
-        run: rm -f ${{ runner.temp }}/routepix-release.jks
+        run: |
+          rm -f ${{ runner.temp }}/routepix-release.jks
+          rm -f app/google-services.json
