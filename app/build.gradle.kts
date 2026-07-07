@@ -6,6 +6,13 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+import java.util.Properties
+
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(file.inputStream())
+}
+
 android {
     namespace = "com.routepix"
     compileSdk = 35
@@ -14,10 +21,14 @@ android {
         applicationId = "com.routepix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 26
-        versionName = "2.6.2"
+        versionCode = 27
+        versionName = "2.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Telegram API credentials — read from local.properties (gitignored)
+        buildConfigField("int", "TG_API_ID", localProps.getProperty("TG_API_ID", "0"))
+        buildConfigField("String", "TG_API_HASH", "\"${localProps.getProperty("TG_API_HASH", "")}\"")
     }
 
     // Release signing config — reads from environment variables injected by CI.
@@ -65,6 +76,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -134,6 +146,9 @@ dependencies {
 
     // Downloadable Fonts (Google Fonts API for Compose)
     implementation("androidx.compose.ui:ui-text-google-fonts")
+
+    // TDLib — Telegram Database Library (prebuilt via JitPack)
+    implementation("com.github.tdlibx:td:1.8.56")
 
 
     // Testing

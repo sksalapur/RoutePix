@@ -16,9 +16,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +31,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -45,6 +50,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import com.routepix.ui.components.GlassTopBar
 import com.routepix.ui.components.RoutepixLoader
+import com.routepix.data.remote.TelegramClientManager
+import org.drinkless.tdlib.TdApi
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +69,14 @@ fun SettingsScreen(
     
     var isEditing by remember { mutableStateOf(false) }
     var showTelegramGuide by remember { mutableStateOf(false) }
+    var botTokenVisible by remember { mutableStateOf(false) }
+    var chatIdVisible by remember { mutableStateOf(false) }
+    var showTelegramAuthSheet by remember { mutableStateOf(false) }
+    val telegramAuthViewModel: TelegramAuthViewModel = viewModel()
+    val telegramAuthState by telegramAuthViewModel.uiState.collectAsState()
+    // Direct observation of TDLib auth state — single source of truth for connection status
+    val tdlibAuthState by TelegramClientManager.authorizationState.collectAsState()
+    val isTelegramConnected = tdlibAuthState is TdApi.AuthorizationStateReady
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -215,7 +231,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             SettingsCard(
-                title = "Telegram Bot Configuration",
+                title = "Recommended: Automatic Configuration",
                 action = {
                     IconButton(onClick = { showTelegramGuide = true }) {
                         Icon(Icons.Default.Info, contentDescription = "Help")
@@ -227,7 +243,103 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val hasCredentials = botToken.isNotEmpty() && chatId.isNotEmpty()
+                
+                // --- Button 1: Telegram Connection ---
+                Button(
+                    onClick = {
+                        if (isTelegramConnected) {
+                            telegramAuthViewModel.logout()
+                        } else {
+                            telegramAuthViewModel.startAuth()
+                        }
+                        showTelegramAuthSheet = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_telegram),
+                        contentDescription = "Telegram",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        if (isTelegramConnected) "Change Linked Telegram Account" else "Connect Telegram",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- Button 2: Bot Credentials ---
+                Button(
+                    onClick = {
+                        telegramAuthViewModel.createBot()
+                        showTelegramAuthSheet = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = isTelegramConnected
+                ) {
+                    Text(
+                        if (hasCredentials) "Create a new bot and get Credentials" else "Get Bot Credentials",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // --- OR divider ---
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        " OR ",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- Advanced: Manual Configuration ---
+                Text(
+                    "Advanced: Manual Configuration",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TextButton(
+                    onClick = { showTelegramGuide = true },
+                    modifier = Modifier.padding(vertical = 2.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Guide",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "How to get credentials manually?",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+
                 OutlinedTextField(
                     value = botToken,
                     onValueChange = { botToken = it },
@@ -235,7 +347,15 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     readOnly = !isEditing,
-                    trailingIcon = { Icon(Icons.Default.Lock, null) }
+                    visualTransformation = if (botTokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { botTokenVisible = !botTokenVisible }) {
+                            Icon(
+                                imageVector = if (botTokenVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (botTokenVisible) "Hide Bot Token" else "Show Bot Token"
+                            )
+                        }
+                    }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -243,11 +363,18 @@ fun SettingsScreen(
                     onValueChange = { chatId = it },
                     label = { Text("Chat ID") },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
                     readOnly = !isEditing,
-                    shape = RoundedCornerShape(12.dp)
+                    visualTransformation = if (chatIdVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { chatIdVisible = !chatIdVisible }) {
+                            Icon(
+                                imageVector = if (chatIdVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (chatIdVisible) "Hide Chat ID" else "Show Chat ID"
+                            )
+                        }
+                    }
                 )
-
-
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -446,6 +573,32 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    // ── Auto-fill bot token + chat ID when BotFather automation completes, and persist ──
+    LaunchedEffect(telegramAuthState.createdBotToken, telegramAuthState.createdChatId) {
+        val token = telegramAuthState.createdBotToken
+        val id = telegramAuthState.createdChatId
+        if (token != null && id != null) {
+            botToken = token
+            chatId = id
+            // Auto-save so credentials survive navigation
+            viewModel.saveSettings(displayName, token, id, showInGallery)
+        }
+    }
+
+    // ── Telegram Auth Bottom Sheet ─────────────────────────────────────
+    if (showTelegramAuthSheet) {
+        TelegramAuthBottomSheet(
+            uiState = telegramAuthState,
+            onSubmitPhoneNumber = { telegramAuthViewModel.submitPhoneNumber(it) },
+            onSubmitCode = { telegramAuthViewModel.submitCode(it) },
+            onCreateBot = { telegramAuthViewModel.createBot() },
+            onDismiss = {
+                showTelegramAuthSheet = false
+                telegramAuthViewModel.resetState()
+            }
+        )
     }
 }
 
