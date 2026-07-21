@@ -166,6 +166,8 @@ Every photo sharing solution compromises on something:
 1. Head to the [GitHub Releases](https://github.com/sksalapur/RoutePix/releases) page and download the latest APK.
 2. Open the APK on your Android device to install.
 
+> **Note for Admins Upgrading to v2.8.0:** To apply the new Face Detection features to photos uploaded *before* v2.8.0, download the **RoutePix Legacy Helper** APK from the releases page. Since it uses a debug signature, you may need to temporarily uninstall your main RoutePix app to install the helper. Run the migration via the Magic Wand icon, and then you can safely uninstall the helper and reinstall the official `v2.8.0` release!
+
 > **Note:** Since RoutePix is distributed via GitHub Releases (not Play Store), Android may show a Play Protect warning. Tap **More details → Install anyway** to proceed.
 
 ### 2. Get Your Telegram Credentials
