@@ -140,6 +140,7 @@ fun TimelineScreen(
     val userNames by timelineViewModel.userNames.collectAsState()
     val availableTags by timelineViewModel.availableTags.collectAsState()
     val uploadProgress by timelineViewModel.uploadProgress.collectAsState()
+    val migrationProgress by timelineViewModel.migrationProgress.collectAsState()
     val selectedPhotoIds by timelineViewModel.selectedPhotoIds.collectAsState()
     val viewMode by timelineViewModel.viewMode.collectAsState()
     val pendingUpload by photoPickerViewModel.pendingUpload.collectAsState()
@@ -551,11 +552,42 @@ fun TimelineScreen(
             }
         },
         bottomBar = {
-            if (uploadProgress.isActive) {
-                UploadProgressBar(
-                    progress = uploadProgress,
-                    onCancel = { timelineViewModel.cancelUpload() }
-                )
+            Column {
+                if (migrationProgress.isMigrating) {
+                    androidx.compose.material3.Surface(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        tonalElevation = 4.dp
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Migrating legacy photos...",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = if (migrationProgress.total > 0) migrationProgress.processed.toFloat() / migrationProgress.total else 0f,
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50))
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${migrationProgress.processed} / ${migrationProgress.total}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                                modifier = Modifier.align(Alignment.End)
+                            )
+                        }
+                    }
+                }
+                
+                if (uploadProgress.isActive) {
+                    UploadProgressBar(
+                        progress = uploadProgress,
+                        onCancel = { timelineViewModel.cancelUpload() }
+                    )
+                }
             }
         }
     ) { padding ->
@@ -597,6 +629,11 @@ fun TimelineScreen(
                             contentDescription = if (showSearch) "Close search" else "Search photos by scene or object",
                             tint = if (showSearch) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                    if (isAdmin) {
+                        IconButton(onClick = { timelineViewModel.migrateLegacyPhotos(context) }) {
+                            Icon(Icons.Default.AutoFixHigh, contentDescription = "Migrate Legacy Photos", tint = MaterialTheme.colorScheme.secondary)
+                        }
                     }
                     IconButton(onClick = { showQualityInfo = true }) {
                         Icon(Icons.Default.Info, contentDescription = "About image quality", tint = MaterialTheme.colorScheme.primary)

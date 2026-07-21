@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
+import android.content.Context
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
 import coil.imageLoader
@@ -866,4 +867,69 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             .map { (date, list) -> ActivityEntry(date, list.size) }
             .sortedBy { photos.firstOrNull { p -> dateFormat.format(Date(p.timestamp)) == it.date }?.timestamp ?: 0L }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Legacy Photo Migration ────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    data class MigrationProgress(
+        val isMigrating: Boolean = false,
+        val processed: Int = 0,
+        val total: Int = 0
+    )
+
+    private val _migrationProgress = MutableStateFlow(MigrationProgress())
+    val migrationProgress: StateFlow<MigrationProgress> = _migrationProgress.asStateFlow()
+
+    fun migrateLegacyPhotos(context: Context) {
+        val trip = _activeTrip.value ?: return
+        if (trip.adminUid != auth.currentUser?.uid) return
+        
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val allPhotos = _photos.value
+            // Target photos that likely haven't been processed (no AI labels)
+            val legacyPhotos = allPhotos.filter { it.aiLabels == null }
+            if (legacyPhotos.isEmpty()) return@launch
+
+            _migrationProgress.value = MigrationProgress(isMigrating = true, processed = 0, total = legacyPhotos.size)
+            
+            val token = getBotToken(trip.adminUid) ?: return@launch
+            val client = okhttp3.OkHttpClient()
+            
+            var processedCount = 0
+            for (photo in legacyPhotos) {
+                try {
+                    val fileResponse = RetrofitClient.telegramApi.getFile(token, photo.telegramFileId)
+                    val filePath = fileResponse.result?.filePath ?: continue
+                    val url = "https://api.telegram.org/file/bot$token/$filePath"
+                    
+                    val request = okhttp3.Request.Builder().url(url).build()
+                    client.newCall(request).execute().use { response ->
+                        val bytes = response.body?.bytes() ?: return@use
+                        val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        if (bitmap != null) {
+                            val faces = com.routepix.util.FaceCounter.countFaces(bitmap)
+                            val labels = com.routepix.util.ImageLabeler.label(bitmap) ?: ""
+                            
+                            firestore.collection("trips").document(trip.tripId)
+                                .collection("photos").document(photo.photoId)
+                                .update(
+                                    mapOf(
+                                        "faceCount" to faces,
+                                        "aiLabels" to labels
+                                    )
+                                ).await()
+                            
+                            bitmap.recycle()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("TimelineVM", "Migration failed for photo ${photo.photoId}", e)
+                }
+                processedCount++
+                _migrationProgress.value = _migrationProgress.value.copy(processed = processedCount)
+            }
+            _migrationProgress.value = MigrationProgress(isMigrating = false)
+        }
+    }
 }

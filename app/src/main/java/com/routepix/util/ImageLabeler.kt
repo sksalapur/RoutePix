@@ -44,7 +44,22 @@ object ImageLabeler {
         return try {
             val bitmap = decodeSampledBitmap(context, uri, SAMPLE_SIZE, SAMPLE_SIZE)
                 ?: return null
+            val result = label(bitmap)
+            bitmap.recycle()
+            Log.d(TAG, "Labels for $uri: $result")
+            result
+        } catch (e: Exception) {
+            Log.w(TAG, "Image labeling failed for $uri", e)
+            null // non-fatal: queue without labels
+        }
+    }
 
+    /**
+     * Labels the image from a [Bitmap].
+     * Note: Does NOT recycle the bitmap automatically.
+     */
+    suspend fun label(bitmap: Bitmap): String? {
+        return try {
             val image   = InputImage.fromBitmap(bitmap, 0)
             val options = ImageLabelerOptions.Builder()
                 .setConfidenceThreshold(MIN_CONFIDENCE)
@@ -61,23 +76,14 @@ object ImageLabeler {
                         cont.resume(top)
                     }
                     .addOnFailureListener { cont.resumeWithException(it) }
-                    .addOnCanceledListener  { cont.cancel() }
+                    .addOnCanceledListener { cont.cancel() }
             }
 
             labeler.close()
-            bitmap.recycle()
-
-            if (labels.isEmpty()) {
-                Log.d(TAG, "No labels above threshold for $uri")
-                null
-            } else {
-                val result = labels.joinToString(",")
-                Log.d(TAG, "Labeled $uri → $result")
-                result
-            }
+            if (labels.isEmpty()) null else labels.joinToString(",")
         } catch (e: Exception) {
-            Log.w(TAG, "Labeling failed for $uri", e)
-            null  // non-fatal: photo is still queued, just without AI labels
+            Log.w(TAG, "Image labeling failed for Bitmap", e)
+            null
         }
     }
 

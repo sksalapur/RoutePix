@@ -39,7 +39,22 @@ object FaceCounter {
         return try {
             val bitmap = decodeSampledBitmap(context, uri, SAMPLE_SIZE, SAMPLE_SIZE)
                 ?: return 0
+            val count = countFaces(bitmap)
+            bitmap.recycle()
+            Log.d(TAG, "Detected $count face(s) in $uri")
+            count
+        } catch (e: Exception) {
+            Log.w(TAG, "Face detection failed for $uri", e)
+            0 // non-fatal: photo is still queued, just without face count
+        }
+    }
 
+    /**
+     * Counts the number of faces in a [Bitmap].
+     * Note: Does NOT recycle the bitmap automatically.
+     */
+    suspend fun countFaces(bitmap: Bitmap): Int {
+        return try {
             val image = InputImage.fromBitmap(bitmap, 0)
             val options = FaceDetectorOptions.Builder()
                 .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -56,13 +71,10 @@ object FaceCounter {
             }
 
             detector.close()
-            bitmap.recycle()
-
-            Log.d(TAG, "Detected $count face(s) in $uri")
             count
         } catch (e: Exception) {
-            Log.w(TAG, "Face detection failed for $uri", e)
-            0 // non-fatal: photo is still queued, just without face count
+            Log.w(TAG, "Face detection failed for Bitmap", e)
+            0
         }
     }
 
