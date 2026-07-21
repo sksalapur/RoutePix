@@ -887,8 +887,8 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val allPhotos = _photos.value
-            // Target photos that likely haven't been processed (no AI labels)
-            val legacyPhotos = allPhotos.filter { it.aiLabels == null }
+            // Target photos that likely haven't been fully processed (missing AI labels or face counts)
+            val legacyPhotos = allPhotos.filter { it.aiLabels == null || it.faceCount == 0 }
             if (legacyPhotos.isEmpty()) return@launch
 
             _migrationProgress.value = MigrationProgress(isMigrating = true, processed = 0, total = legacyPhotos.size)
@@ -909,7 +909,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                         val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                         if (bitmap != null) {
                             val faces = com.routepix.util.FaceCounter.countFaces(bitmap)
-                            val labels = com.routepix.util.ImageLabeler.label(bitmap) ?: ""
+                            val labels = com.routepix.util.ImageLabeler.label(bitmap) ?: photo.aiLabels ?: ""
                             
                             firestore.collection("trips").document(trip.tripId)
                                 .collection("photos").document(photo.photoId)
