@@ -22,5 +22,7 @@ data class QueuedPhoto(
     val md5Hash: String,
     val isMotionPhoto: Boolean = false,
     /** Top AI-detected concepts, comma-separated (e.g. "Mountain,Sky,Snow"). Null if labeling failed. */
-    val aiLabels: String? = null
+    val aiLabels: String? = null,
+    /** Number of faces detected by on-device ML Kit. 0 for no-face or failed detection. */
+    val faceCount: Int = 0
 )

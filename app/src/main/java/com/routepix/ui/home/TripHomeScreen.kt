@@ -47,9 +47,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
+import com.routepix.data.cache.ThumbnailCache
 import com.routepix.ui.components.GlassTopBar
 import com.routepix.ui.components.RoutepixLoader
 import androidx.compose.animation.core.Animatable
@@ -80,8 +82,10 @@ fun TripHomeScreen(
     }
     
     val downloadProgressMap by tripHomeViewModel.downloadProgress.collectAsState()
+    val coverPhotoFileIds by tripHomeViewModel.coverPhotoFileIds.collectAsState()
+    val resolvedUrls by ThumbnailCache.resolvedUrls.collectAsState()
     val context = LocalContext.current
-    val isBuildingCache by com.routepix.data.cache.ThumbnailCache.isPrefetching.collectAsState()
+    val isBuildingCache by ThumbnailCache.isPrefetching.collectAsState()
 
     Scaffold(
         topBar = {
@@ -270,9 +274,18 @@ fun TripHomeScreen(
             }
 
             items(uiState.trips, key = { it.tripId }) { trip ->
+                // Prefer HD-resolved URLs; fall back to thumbnail cache lookup
+                val hdCoverUrls = tripHomeViewModel.coverPhotoUrls.collectAsState().value[trip.tripId]
+                val coverPhotoUrls = if (!hdCoverUrls.isNullOrEmpty()) {
+                    hdCoverUrls
+                } else {
+                    val coverFileIds = coverPhotoFileIds[trip.tripId] ?: emptyList()
+                    coverFileIds.mapNotNull { resolvedUrls[it] }
+                }
                 TripListItem(
                     trip = trip,
                     currentUid = tripHomeViewModel.getCurrentUid() ?: "",
+                    coverPhotoUrls = coverPhotoUrls,
                     onClick = { onTripClick(trip) },
                     onEditClick = { tripToRename = trip },
                     onMembersClick = { tripToShowMembers = trip },
@@ -442,6 +455,7 @@ private fun ActionCard(
 private fun TripListItem(
     trip: Trip,
     currentUid: String,
+    coverPhotoUrls: List<String>,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onMembersClick: () -> Unit,
@@ -455,63 +469,166 @@ private fun TripListItem(
     val context = LocalContext.current
     var showDownloadConfirm by remember { mutableStateOf(false) }
 
+    val hasCover = coverPhotoUrls.isNotEmpty()
+    // Icon tint: white when over a photo, primary when over the fallback surface
+    val iconTint = if (hasCover) Color.White else MaterialTheme.colorScheme.primary
+    val exitIconTint = if (hasCover) Color(0xFFFF8A80) else MaterialTheme.colorScheme.error
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .height(200.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = onClick
             ),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Trip name — full width, up to 2 lines
-            Text(
-                text = trip.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Meta info + action icons row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: code + members
-                Column {
-                    Text(
-                        text = "Code: ${trip.inviteCode}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${trip.memberUids.size} members",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+        Box(modifier = Modifier.fillMaxSize()) {
+            // ── Cover photo: collage, single, or fallback gradient ──
+            when {
+                coverPhotoUrls.size >= 2 -> {
+                    // 2×2 collage grid
+                    val displayUrls = coverPhotoUrls.take(4)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(displayUrls[0]).crossfade(true).build(),
+                                contentDescription = null,
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                contentScale = ContentScale.Crop
+                            )
+                            if (displayUrls.size > 1) {
+                                Spacer(modifier = Modifier.width(1.5.dp))
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(displayUrls[1]).crossfade(true).build(),
+                                    contentDescription = null,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                        if (displayUrls.size > 2) {
+                            Spacer(modifier = Modifier.height(1.5.dp))
+                            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(displayUrls[2]).crossfade(true).build(),
+                                    contentDescription = null,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                if (displayUrls.size > 3) {
+                                    Spacer(modifier = Modifier.width(1.5.dp))
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(displayUrls[3]).crossfade(true).build(),
+                                        contentDescription = null,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                coverPhotoUrls.size == 1 -> {
+                    // Single full-bleed cover
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(coverPhotoUrls[0])
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Cover photo for ${trip.name}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
                 }
+                else -> {
+                    // Fallback: subtle gradient for trips with no photos
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        MaterialTheme.colorScheme.surface
+                                    )
+                                )
+                            )
+                    )
+                }
+            }
 
-                // Right: action icons
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            // ── Gradient overlay for readability ──
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                0.25f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = if (hasCover) 0.9f else 0.4f)
+                            )
+                        )
+                    )
+            )
+
+            // ── Content overlaid on the gradient ──
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 16.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                // Trip name
+                Text(
+                    text = trip.name,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        shadow = androidx.compose.ui.graphics.Shadow(
+                            color = if (hasCover) Color.Black.copy(alpha = 0.6f) else Color.Transparent,
+                            blurRadius = 8f
+                        )
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = if (hasCover) Color.White else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Meta info row
+                Text(
+                    text = "Code: ${trip.inviteCode}  •  ${trip.memberUids.size} members",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (hasCover) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Action icons row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     // Share
                     IconButton(onClick = {
                         val encodedName = java.net.URLEncoder.encode(trip.name, "UTF-8")
-                        // HTTPS link — clickable in all messaging apps.
-                        // Opens the app if installed, else shows a web page that falls back to releases.
                         val joinLink = "https://sksalapur.github.io/RoutePix/join?code=${trip.inviteCode}&name=$encodedName"
                         val shareText = "Hey! Join me on \"${trip.name}\" trip on RoutePix!\n\n$joinLink"
                         val sendIntent = Intent().apply {
@@ -521,7 +638,7 @@ private fun TripListItem(
                         }
                         context.startActivity(Intent.createChooser(sendIntent, null))
                     }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = iconTint, modifier = Modifier.size(20.dp))
                     }
 
                     // Download album
@@ -530,29 +647,31 @@ private fun TripListItem(
                             Text(
                                 text = downloadProgress,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = iconTint,
                                 fontWeight = FontWeight.Bold
                             )
                         } else {
-                            Icon(Icons.Default.Download, contentDescription = "Download Album", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Download, contentDescription = "Download Album", tint = iconTint, modifier = Modifier.size(20.dp))
                         }
                     }
 
                     // Edit (admin only)
                     if (trip.adminUid == currentUid) {
                         IconButton(onClick = onEditClick, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = iconTint, modifier = Modifier.size(20.dp))
                         }
                     }
 
                     // Members
                     IconButton(onClick = onMembersClick, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Person, contentDescription = "Members", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Person, contentDescription = "Members", tint = iconTint, modifier = Modifier.size(20.dp))
                     }
+
+                    Spacer(modifier = Modifier.weight(1f))
 
                     // Exit
                     IconButton(onClick = onExitClick, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Exit Trip", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Exit Trip", tint = exitIconTint, modifier = Modifier.size(20.dp))
                     }
                 }
             }

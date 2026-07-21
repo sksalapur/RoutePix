@@ -386,7 +386,11 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
             // Runs eagerly here so the photo enters the DB fully hydrated.
             // Non-fatal: if labeling fails, aiLabels = null and the photo still queues.
             val aiLabels = ImageLabeler.label(context, uri)
-            Log.d(TAG, "Enqueue: uri=$uri isMotion=$isMotion aiLabels=$aiLabels")
+
+            // ── Face Detection (on-device, offline, Dispatchers.IO) ────────────────
+            // Non-fatal: if detection fails, faceCount = 0 and the photo still queues.
+            val faceCount = com.routepix.util.FaceCounter.countFaces(context, uri)
+            Log.d(TAG, "Enqueue: uri=$uri isMotion=$isMotion aiLabels=$aiLabels faceCount=$faceCount")
 
             val queuedPhoto = QueuedPhoto(
                 localUri = uri.toString(),
@@ -397,7 +401,8 @@ class PhotoPickerViewModel(application: Application) : AndroidViewModel(applicat
                 tag = tag,
                 md5Hash = md5,
                 isMotionPhoto = isMotion,
-                aiLabels = aiLabels
+                aiLabels = aiLabels,
+                faceCount = faceCount
             )
             val insertedId = dao.insert(queuedPhoto).toInt()
             EnqueueResult.Queued(insertedId)

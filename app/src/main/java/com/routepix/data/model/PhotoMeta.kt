@@ -19,5 +19,9 @@ data class PhotoMeta(
     val aiLabels: String? = null,
     @get:PropertyName("isMotionPhoto")
     @set:PropertyName("isMotionPhoto")
-    var isMotionPhoto: Boolean = false
+    var isMotionPhoto: Boolean = false,
+    /** Number of faces detected by on-device ML Kit Face Detection. 0 for legacy/no-face photos. */
+    val faceCount: Int = 0,
+    /** Emoji reactions. Key = emoji (e.g. "🔥"), value = list of UIDs who reacted. */
+    val reactions: Map<String, List<String>> = emptyMap()
 )

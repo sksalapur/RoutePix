@@ -310,7 +310,8 @@ class PhotoUploadWorker(
             md5Hash = photo.md5Hash,
             sizeBytes = photoFileSize,
             isMotionPhoto = isMotion,
-            aiLabels = photo.aiLabels
+            aiLabels = photo.aiLabels,
+            faceCount = photo.faceCount
         )
 
         try {

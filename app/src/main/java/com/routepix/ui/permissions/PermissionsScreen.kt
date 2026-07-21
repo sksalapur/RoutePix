@@ -22,7 +22,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
@@ -56,6 +61,9 @@ fun PermissionsScreen(
         mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName))
     }
 
+    var termsAccepted by remember { mutableStateOf(false) }
+    var showTermsDialog by remember { mutableStateOf(false) }
+
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasNotificationPermission = granted }
@@ -66,8 +74,8 @@ fun PermissionsScreen(
         hasStoragePermission = results.values.all { it }
     }
 
-    LaunchedEffect(hasNotificationPermission, hasStoragePermission, isIgnoringBatteryOptimizations) {
-        if (hasNotificationPermission && hasStoragePermission && isIgnoringBatteryOptimizations) {
+    LaunchedEffect(hasNotificationPermission, hasStoragePermission, isIgnoringBatteryOptimizations, termsAccepted) {
+        if (hasNotificationPermission && hasStoragePermission && isIgnoringBatteryOptimizations && termsAccepted) {
             onAllGranted()
         }
     }
@@ -102,6 +110,27 @@ fun PermissionsScreen(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
+    }
+
+    // ── Terms & Conditions Dialog ──
+    if (showTermsDialog) {
+        AlertDialog(
+            onDismissRequest = { showTermsDialog = false },
+            title = { Text("Terms and Conditions", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("By using RoutePix, you agree to the following:")
+                    Text("• RoutePix is an independent application and is not affiliated with, endorsed by, or connected to Telegram FZ-LLC or any of its subsidiaries.")
+                    Text("• Your photos are stored securely in your private Telegram chats. RoutePix does not store your images on any external server.")
+                    Text("• You retain full ownership of all content you upload through RoutePix. We do not claim any rights over your photos.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTermsDialog = false }) {
+                    Text("Understood")
+                }
+            }
+        )
     }
 
     Scaffold { padding ->
@@ -163,21 +192,66 @@ fun PermissionsScreen(
                 icon = Icons.Default.BatteryFull,
                 checked = isIgnoringBatteryOptimizations,
                 onToggle = {
-                    if (!isIgnoringBatteryOptimizations) {
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:${context.packageName}")
-                        }
-                        context.startActivity(intent)
-                    }
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    intent.data = Uri.parse("package:${context.packageName}")
+                    context.startActivity(intent)
                 }
             )
 
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Terms & Conditions checkbox ──
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            ) {
+                Checkbox(
+                    checked = termsAccepted,
+                    onCheckedChange = { termsAccepted = it }
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+
+                val tosColor = MaterialTheme.colorScheme.onSurfaceVariant
+                val tosHighlight = MaterialTheme.colorScheme.primary
+
+                val annotatedText = buildAnnotatedString {
+                    withStyle(style = SpanStyle(color = tosColor)) {
+                        append("I agree to RoutePix ")
+                    }
+                    pushStringAnnotation(tag = "TOS", annotation = "open")
+                    withStyle(
+                        style = SpanStyle(
+                            color = tosHighlight,
+                            fontWeight = FontWeight.SemiBold,
+                            textDecoration = TextDecoration.Underline
+                        )
+                    ) {
+                        append("terms and conditions")
+                    }
+                    pop()
+                }
+
+                ClickableText(
+                    text = annotatedText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    onClick = { offset ->
+                        annotatedText.getStringAnnotations(
+                            tag = "TOS",
+                            start = offset,
+                            end = offset
+                        ).firstOrNull()?.let {
+                            showTermsDialog = true
+                        }
+                    }
+                )
+            }
+            
             Spacer(modifier = Modifier.weight(1f))
             
             Button(
                 onClick = onAllGranted,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = hasStoragePermission // Mandatory
+                enabled = hasStoragePermission && termsAccepted // Mandatory
             ) {
                 Text(if (hasStoragePermission && hasNotificationPermission && isIgnoringBatteryOptimizations) "Get Started" else "Continue with basic access")
             }

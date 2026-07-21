@@ -21,8 +21,8 @@ android {
         applicationId = "com.routepix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 27
-        versionName = "2.7.0"
+        versionCode = 28
+        versionName = "2.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -140,6 +140,9 @@ dependencies {
 
     // ML Kit — on-device image labeling (bundled model, offline-first, no Play Services required)
     implementation("com.google.mlkit:image-labeling:17.0.9")
+
+    // ML Kit — on-device face detection (bundled model, offline-first)
+    implementation("com.google.mlkit:face-detection:16.1.7")
 
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")

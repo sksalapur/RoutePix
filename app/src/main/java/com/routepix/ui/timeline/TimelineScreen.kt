@@ -149,7 +149,11 @@ fun TimelineScreen(
     val searchQuery    by timelineViewModel.searchQuery.collectAsState()
     val searchResults  by timelineViewModel.searchResults.collectAsState()
     val isSearchActive by timelineViewModel.isSearchActive.collectAsState()
+    val activeFaceFilter by timelineViewModel.faceFilter.collectAsState()
+    val isTimelineLoading by timelineViewModel.isLoading.collectAsState()
     var showSearch     by rememberSaveable { mutableStateOf(false) }
+    var showAnalytics  by rememberSaveable { mutableStateOf(false) }
+    var showStory      by rememberSaveable { mutableStateOf(false) }
     
     var selectedGroupKey by rememberSaveable { mutableStateOf<String?>(null) }
     var showTagEditSheet by rememberSaveable { mutableStateOf(false) }
@@ -501,28 +505,6 @@ fun TimelineScreen(
                                 )
                             }
                         }
-                    } else {
-                        // ── Search toggle ─────────────────────────────────────────────────
-                        IconButton(onClick = {
-                            showSearch = !showSearch
-                            if (!showSearch) timelineViewModel.clearSearch()
-                        }) {
-                            Icon(
-                                imageVector = if (showSearch) Icons.Default.SearchOff else Icons.Default.Search,
-                                contentDescription = if (showSearch) "Close search" else "Search photos by scene or object",
-                                tint = if (showSearch) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = { showQualityInfo = true }) {
-                            Icon(Icons.Default.Info, contentDescription = "About image quality", tint = MaterialTheme.colorScheme.primary)
-                        }
-                        SortModeSelector(
-                            currentMode = sortMode,
-                            onModeSelected = {
-                                timelineViewModel.setSortMode(it)
-                                selectedGroupKey = null
-                            }
-                        )
                     }
                 }
             )
@@ -586,8 +568,48 @@ fun TimelineScreen(
                 }
         ) {
             Column(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding())
             ) {
+
+            // ── Main Action Options (Below Title) ──────────────────────────────
+            if (selectedPhotoIds.isEmpty() && selectedGroupKey == null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, start = 8.dp, end = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showStory = true }) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = "Play Trip Highlights", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    IconButton(onClick = { showAnalytics = true }) {
+                        Icon(Icons.Default.BarChart, contentDescription = "Trip Analytics", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    IconButton(onClick = {
+                        showSearch = !showSearch
+                        if (!showSearch) timelineViewModel.clearSearch()
+                    }) {
+                        Icon(
+                            imageVector = if (showSearch) Icons.Default.SearchOff else Icons.Default.Search,
+                            contentDescription = if (showSearch) "Close search" else "Search photos by scene or object",
+                            tint = if (showSearch) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(onClick = { showQualityInfo = true }) {
+                        Icon(Icons.Default.Info, contentDescription = "About image quality", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    SortModeSelector(
+                        currentMode = sortMode,
+                        onModeSelected = {
+                            timelineViewModel.setSortMode(it)
+                            selectedGroupKey = null
+                        }
+                    )
+                }
+            }
 
             // ── Animated semantic search bar ─────────────────────────────────────
             AnimatedVisibility(
@@ -597,18 +619,44 @@ fun TimelineScreen(
                 exit  = androidx.compose.animation.shrinkVertically() +
                         androidx.compose.animation.fadeOut(animationSpec = tween(150))
             ) {
-                SemanticSearchBar(
-                    query        = searchQuery,
-                    onQueryChange = { timelineViewModel.updateSearchQuery(it) },
-                    modifier     = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            top    = padding.calculateTopPadding() + 8.dp,
-                            start  = 16.dp,
-                            end    = 16.dp,
-                            bottom = 4.dp
+                Column {
+                    SemanticSearchBar(
+                        query        = searchQuery,
+                        onQueryChange = { timelineViewModel.updateSearchQuery(it) },
+                        modifier     = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                top    = 8.dp,
+                                start  = 16.dp,
+                                end    = 16.dp,
+                                bottom = 4.dp
+                            )
+                    )
+
+                    // ── Face filter chips ──────────────────────────────────────────
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = activeFaceFilter == FaceFilter.SOLO,
+                            onClick = { timelineViewModel.setFaceFilter(FaceFilter.SOLO) },
+                            label = { Text("\uD83D\uDC64 Solo") }
                         )
-                )
+                        FilterChip(
+                            selected = activeFaceFilter == FaceFilter.DUO,
+                            onClick = { timelineViewModel.setFaceFilter(FaceFilter.DUO) },
+                            label = { Text("\uD83D\uDC65 Duo") }
+                        )
+                        FilterChip(
+                            selected = activeFaceFilter == FaceFilter.GROUP,
+                            onClick = { timelineViewModel.setFaceFilter(FaceFilter.GROUP) },
+                            label = { Text("\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66 Group") }
+                        )
+                    }
+                }
             }
 
             // ── Main content: search results or normal album grid ─────────────
@@ -620,11 +668,32 @@ fun TimelineScreen(
                     padding           = if (showSearch) PaddingValues(
                         top    = 0.dp,   // search bar already provides top spacing
                         bottom = padding.calculateBottomPadding()
-                    ) else padding
+                    ) else PaddingValues(bottom = padding.calculateBottomPadding())
                 )
+            } else if (isTimelineLoading) {
+                // Show loading indicator while data is being fetched
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Loading albums…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             } else if (photos.isEmpty()) {
                 EmptyTimelineState(
-                    modifier = Modifier.fillMaxSize().padding(padding)
+                    modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())
                 )
             } else {
                 Crossfade(
@@ -669,7 +738,7 @@ fun TimelineScreen(
                                                 }
                                             },
                                         contentPadding = PaddingValues(
-                                            top = padding.calculateTopPadding() + 16.dp,
+                                            top = 16.dp,
                                             bottom = padding.calculateBottomPadding() + 80.dp,
                                             start = 4.dp,
                                             end = 20.dp // leave room for the thumb
@@ -777,7 +846,7 @@ fun TimelineScreen(
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(
-                                        top = padding.calculateTopPadding() + 16.dp,
+                                        top = 16.dp,
                                         bottom = padding.calculateBottomPadding() + 80.dp
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -813,7 +882,7 @@ fun TimelineScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                              contentPadding = PaddingValues(
-                                 top = padding.calculateTopPadding() + 16.dp,
+                                 top = 16.dp,
                                  bottom = padding.calculateBottomPadding() + 80.dp
                              )
                         ) {
@@ -1009,6 +1078,39 @@ fun TimelineScreen(
                 }
             },
             icon = { Icon(Icons.Default.Info, null) }
+        )
+    }
+
+    // ── Analytics full-screen overlay ───────────────────────────────────────
+    AnimatedVisibility(
+        visible = showAnalytics,
+        enter = androidx.compose.animation.slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = tween(350)
+        ) + androidx.compose.animation.fadeIn(animationSpec = tween(250)),
+        exit = androidx.compose.animation.slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = tween(300)
+        ) + androidx.compose.animation.fadeOut(animationSpec = tween(200))
+    ) {
+        TripAnalyticsScreen(
+            viewModel = timelineViewModel,
+            totalPhotoCount = photos.size,
+            onClose = { showAnalytics = false }
+        )
+    }
+
+    // ── Story Highlights full-screen overlay ─────────────────────────────────
+    AnimatedVisibility(
+        visible = showStory && photos.isNotEmpty(),
+        enter = androidx.compose.animation.fadeIn(animationSpec = tween(300)),
+        exit = androidx.compose.animation.fadeOut(animationSpec = tween(200))
+    ) {
+        StoryHighlightScreen(
+            photos = photos,
+            tripName = activeTrip?.name ?: "Trip Highlights",
+            timelineViewModel = timelineViewModel,
+            onClose = { showStory = false }
         )
     }
 }
@@ -1809,7 +1911,7 @@ private fun PhotoPagerOverlay(
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 120.dp) // Padded above the thumbnail surface
+                .padding(bottom = 168.dp) // Padded above the reaction bar + thumbnail surface
                 .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -1852,6 +1954,54 @@ private fun PhotoPagerOverlay(
                     }
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                }
+            }
+        }
+
+        // ── Emoji Reaction Bar ──
+        val reactionPhoto = photoList[pagerState.currentPage]
+        val availableEmojis = listOf("❤️", "🔥", "😍", "😂", "👏", "🤩")
+        val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 120.dp)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            availableEmojis.forEach { emoji ->
+                val reactors = reactionPhoto.reactions[emoji] ?: emptyList()
+                val count = reactors.size
+                val userReacted = currentUid != null && currentUid in reactors
+
+                Surface(
+                    onClick = { timelineViewModel.toggleReaction(reactionPhoto.photoId, emoji) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (userReacted) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            else Color.White.copy(alpha = 0.15f),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = emoji,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        if (count > 0) {
+                            Text(
+                                text = "$count",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }

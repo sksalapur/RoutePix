@@ -48,6 +48,12 @@ enum class ViewMode {
     DETAILED, GRID
 }
 
+enum class FaceFilter {
+    SOLO,  // faceCount == 1
+    DUO,   // faceCount == 2
+    GROUP  // faceCount >= 3
+}
+
 class TimelineViewModel(application: Application, savedStateHandle: SavedStateHandle) : AndroidViewModel(application) {
 
     private val tripId: String = savedStateHandle["tripId"] ?: ""
@@ -62,7 +68,24 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     private val botTokenCache = ConcurrentHashMap<String, String>()
 
     private val _photos = MutableStateFlow<List<PhotoMeta>>(emptyList())
-    val photos: StateFlow<List<PhotoMeta>> = _photos.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _faceFilter = MutableStateFlow<FaceFilter?>(null)
+    val faceFilter: StateFlow<FaceFilter?> = _faceFilter.asStateFlow()
+
+    /** Photos filtered by the active face filter (if any). */
+    val photos: StateFlow<List<PhotoMeta>> = combine(_photos, _faceFilter) { allPhotos, filter ->
+        if (filter == null) allPhotos
+        else allPhotos.filter { photo ->
+            when (filter) {
+                FaceFilter.SOLO  -> photo.faceCount == 1
+                FaceFilter.DUO   -> photo.faceCount == 2
+                FaceFilter.GROUP -> photo.faceCount >= 3
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _userNames = MutableStateFlow<Map<String, String>>(emptyMap())
     val userNames: StateFlow<Map<String, String>> = _userNames.asStateFlow()
@@ -116,7 +139,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         }
     }
 
-    val availableTags: StateFlow<List<String>> = _photos.map { photos ->
+    val availableTags: StateFlow<List<String>> = photos.map { photos ->
         photos.mapNotNull { it.tag }.distinct().sorted()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -132,7 +155,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
      * Expands common queries via a synonym map so "water" matches "lake", "river" etc.
      * Returns an empty list when the query is blank (search inactive).
      */
-    val searchResults: StateFlow<List<PhotoMeta>> = combine(_photos, _searchQuery) { photos, query ->
+    val searchResults: StateFlow<List<PhotoMeta>> = combine(photos, _searchQuery) { photos, query ->
         val rawQuery = query.trim().lowercase()
         if (rawQuery.isBlank()) emptyList()
         else {
@@ -163,7 +186,14 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
                 val labelsText = photo.aiLabels?.lowercase() ?: ""
                 val tagText    = photo.tag?.lowercase() ?: ""
 
-                expandedQueries.any { q ->
+                val matchesFace = when {
+                    rawQuery == "solo" && photo.faceCount == 1 -> true
+                    rawQuery == "duo" && photo.faceCount == 2 -> true
+                    rawQuery == "group" && photo.faceCount >= 3 -> true
+                    else -> false
+                }
+
+                matchesFace || expandedQueries.any { q ->
                     labelsText.contains(q) || tagText.contains(q)
                 }
             }
@@ -178,8 +208,13 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
     fun updateSearchQuery(q: String) { _searchQuery.value = q }
     fun clearSearch() { _searchQuery.value = "" }
 
+    /** Toggle a face filter. Tapping the same filter again clears it. */
+    fun setFaceFilter(filter: FaceFilter?) {
+        _faceFilter.value = if (_faceFilter.value == filter) null else filter
+    }
+
     val groupedPhotos: StateFlow<Map<String, List<PhotoMeta>>> =
-        combine(_photos, _sortMode, _userNames) { photoList, mode, _ ->
+        combine(photos, _sortMode, _userNames) { photoList, mode, _ ->
             groupPhotos(photoList, mode)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
@@ -475,6 +510,40 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
         }
     }
 
+    /**
+     * Toggle an emoji reaction for the current user on a photo.
+     * Uses Firestore's arrayUnion/arrayRemove for atomic updates.
+     * The existing real-time Firestore listener picks up changes instantly.
+     */
+    fun toggleReaction(photoId: String, emoji: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            val photoRef = firestore.collection("trips").document(tripId)
+                .collection("photos").document(photoId)
+            try {
+                // Read the current reactions to check if the user already reacted
+                val doc = photoRef.get().await()
+                @Suppress("UNCHECKED_CAST")
+                val reactions = doc.get("reactions") as? Map<String, List<String>> ?: emptyMap()
+                val currentReactors = reactions[emoji] ?: emptyList()
+
+                if (uid in currentReactors) {
+                    // Remove the user's reaction
+                    photoRef.update("reactions.$emoji",
+                        com.google.firebase.firestore.FieldValue.arrayRemove(uid)
+                    ).await()
+                } else {
+                    // Add the user's reaction
+                    photoRef.update("reactions.$emoji",
+                        com.google.firebase.firestore.FieldValue.arrayUnion(uid)
+                    ).await()
+                }
+            } catch (e: Exception) {
+                Log.w("TimelineVM", "Failed to toggle reaction", e)
+            }
+        }
+    }
+
     private fun loadTrip() {
         viewModelScope.launch {
             try {
@@ -495,6 +564,7 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             _activeTrip.filterNotNull().first()
             photosFlow().collect { photoList ->
                 _photos.value = photoList
+                _isLoading.value = false
                 resolveUserNames(photoList)
                 resolveAllImageUrls(photoList)
             }
@@ -753,4 +823,47 @@ class TimelineViewModel(application: Application, savedStateHandle: SavedStateHa
             }
         }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Analytics: derived stats (all local, no Firestore queries) ──────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    data class LeaderboardEntry(val uid: String, val displayName: String, val count: Int)
+    data class SceneEntry(val label: String, val count: Int)
+    data class ActivityEntry(val date: String, val count: Int)
+
+    /** Leaderboard: photos grouped by uploaderUid, sorted descending. */
+    val leaderboard: StateFlow<List<LeaderboardEntry>> =
+        combine(photos, _userNames) { photos, names ->
+            photos.groupBy { it.uploaderUid }
+                .map { (uid, list) ->
+                    LeaderboardEntry(uid, names[uid] ?: uid.take(8), list.size)
+                }
+                .sortedByDescending { it.count }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Scene breakdown: top AI labels across all photos, sorted descending. */
+    val sceneBreakdown: StateFlow<List<SceneEntry>> = photos.map { photos ->
+        val labelCounts = mutableMapOf<String, Int>()
+        photos.forEach { photo ->
+            photo.aiLabels?.split(",")?.forEach { label ->
+                val trimmed = label.trim()
+                if (trimmed.isNotBlank()) {
+                    labelCounts[trimmed] = (labelCounts[trimmed] ?: 0) + 1
+                }
+            }
+        }
+        labelCounts.entries
+            .map { SceneEntry(it.key, it.value) }
+            .sortedByDescending { it.count }
+            .take(10) // top 10 scenes
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Timeline activity: photos grouped by date, sorted chronologically. */
+    val timelineActivity: StateFlow<List<ActivityEntry>> = photos.map { photos ->
+        val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
+        photos.groupBy { dateFormat.format(Date(it.timestamp)) }
+            .map { (date, list) -> ActivityEntry(date, list.size) }
+            .sortedBy { photos.firstOrNull { p -> dateFormat.format(Date(p.timestamp)) == it.date }?.timestamp ?: 0L }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

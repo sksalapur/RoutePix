@@ -140,6 +140,8 @@ Every photo sharing solution compromises on something:
 
 | Version | Highlight |
 |---------|-----------|
+| **v2.8.0** | **Performance & Search Overhaul** — Parallel cover photo loading, Google Photos-style text search for Solo/Duo/Group. |
+| **v2.7.0** | 🕵️‍♂️ **AI Face Detection & Stories** — ML Kit Face Detection powers Solo/Duo/Group filters. Instagram-style Story Highlights. |
 | **v2.6.0** | 🤖 **AI-Powered Semantic Search** — on-device ML Kit labeling, synonym-aware search. Search your trips by concept: `water`, `nature`, `people`, `city`. |
 | **v2.5.1** | CDN TTL fix — timestamp-based cache invalidation for expiring Telegram file URLs |
 | **v2.0.1** | UX polish — immediate loading overlay after photo selection, download filename convention, `DOWNLOAD_WITHOUT_NOTIFICATION` permission fix |
